@@ -1,0 +1,6 @@
+# Darwin 23.6.0 Darwin Kernel Version 23.6.0: Thu Sep 12 23:35:29 PDT 2024; root:xnu-10063.141.1.701.1~1/RELEASE_ARM64_T6000 arm64
+aedes_masked.shape=(1, 390, 378)
+population_masked_high.shape=(1, 17796, 8789)
+population_masked_low.shape=(390, 378)
+High resolution sum: 97411280.0
+Resampled sum: 0.0

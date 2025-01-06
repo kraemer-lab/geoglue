@@ -1,0 +1,16 @@
+# Darwin23.6.0 Darwin Kernel Version 23.6.0: Thu Sep 12 23:35:29 PDT 2024; root:xnu-10063.141.1.701.1~1/RELEASE_ARM64_T6000 arm64
+
+> high_res_sum
+                                    sum
+vnm_ppp_2020_UNadj_constrained 97540755
+> resampled_sum
+                                    sum
+vnm_ppp_2020_UNadj_constrained 97516913
+> 
+> #extract the area of each cell that is contained within each polygon
+> x <- exactextractr::exact_extract(aedes_masked_total, city_polygon_vect, coverage_area = FALSE,
++                    weights = population_masked_low, 'weighted_mean')
+  |===========================================================================================================================| 100%
+> # no overlap at all in these cases? (4)
+> sum(is.na(x))
+[1] 386
