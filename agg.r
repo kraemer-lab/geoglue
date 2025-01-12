@@ -1,9 +1,9 @@
 # Original code by Moritz Kraemer
 
-install.packages('terra')
-install.packages('sf')
-install.packages('dplyr')
-install.packages('exactextractr')
+# install.packages('terra')
+# install.packages('sf')
+# install.packages('dplyr')
+# install.packages('exactextractr')
 here::i_am("agg.r")
 library(here)
 

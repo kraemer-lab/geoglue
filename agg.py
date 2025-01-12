@@ -81,23 +81,28 @@ def raster_mask(file: str | Path, geometry: gpd.GeoSeries) -> npt.ArrayLike:
         defined by the geometry set to NaN
     """
 
+    print("\nraster_mask reading:", file)
     with rasterio.open(file) as src:
-        masked, _ = rasterio.mask.mask(src, geometry, crop=True)
+        masked, transform = rasterio.mask.mask(src, geometry, crop=True)
         masked[masked == src.nodata] = np.nan
-    return masked
+        print("\tcrs:", src.crs)
+        print("\tbounds:", src.bounds)
+    print("\ttransform:", transform)
+    print("\tshape:", masked.shape)
+    return masked, transform
 
 
-aedes_masked = raster_mask(aedes_raster_file, city_polygons.geometry)
-print(f"{aedes_masked.shape=}")
-population_masked_high = raster_mask(population_raster_file, city_polygons.geometry)
-print(f"{population_masked_high.shape=}")
+aedes_masked, aedes_masked_transform = raster_mask(aedes_raster_file, city_polygons.geometry)
+population_masked_high, population_masked_transform = raster_mask(population_raster_file, city_polygons.geometry)
 
 
 def resample_to_destination(
-    source_raster_file,
-    destination: np.array,
-    target_crs: CRS | str,
-    resampling=Resampling.bilinear,
+    source_data: npt.ArrayLike,
+    source_transform,
+    destination: npt.ArrayLike,
+    destination_transform,
+    crs: CRS | str,
+    resampling,
 ) -> npt.ArrayLike:
     """Resamples source raster to match destination mask
 
@@ -105,12 +110,18 @@ def resample_to_destination(
 
     Parameters
     ----------
-    source_raster_file
+    source_data
         Source raster file
+    source_transform
+        Source transform function
     destination
-        Destination raster data as a numpy array
+        Destination raster data as a numpy array, this is only used to get the shape
+    destination_transform
+        Destination transform
     target_crs
         Target CRS
+    bounds
+         Geometry bounds
     resampling
         Resampling method, one of `rasterio.enums.Resampling`
 
@@ -119,39 +130,34 @@ def resample_to_destination(
     np.array
         Resampled raster data in an array
     """
-    with rasterio.open(source_raster_file) as src:
-        assert src.count == 1
-        source_data = src.read(1)  # Read the first band
-        source_data[source_data == src.nodata] = np.nan
+    print("Resampling using:", resampling)
+    # drop the first index (1)
+    _, height, width = destination.shape  # type: ignore
+    assert isinstance(width, int) and isinstance(height, int)
+    # Create an empty array to hold the resampled data
+    resampled_data = np.zeros((height, width), dtype=np.float32)
 
-        # drop the first index (1)
-        _, height, width = destination.shape
-        # Resampling the source raster to match the target raster's dimensions and grid
-        transform, width, height = calculate_default_transform(
-            src.crs, target_crs, width, height, *src.bounds
-        )
-
-        assert isinstance(width, int) and isinstance(height, int)
-        # Create an empty array to hold the resampled data
-        resampled_data = np.zeros((height, width), dtype=np.float32)
-
-        # Perform the resampling using reproject function
-        reproject(
-            source=source_data,
-            destination=resampled_data,
-            src_transform=src.transform,
-            src_crs=src.crs,
-            dst_transform=transform,
-            dst_crs=target_crs,
-            resampling=resampling,  # Choose resampling method (nearest, bilinear, etc.)
-        )
-        resampled_data[resampled_data == src.nodata] = np.nan
-        return resampled_data
+    # Perform the resampling using reproject function
+    reproject(
+        source=source_data,
+        destination=resampled_data,
+        src_transform=source_transform,
+        src_crs=crs,
+        dst_transform=destination_transform,
+        dst_crs=crs,
+        resampling=resampling,  # Choose resampling method (nearest, bilinear, etc.)
+    )
+    return resampled_data
 
 
 # Resample population raster to match Aedes resolution (the coarser resolution dataset)
 population_masked_low = resample_to_destination(
-    population_raster_file, aedes_masked, city_polygons.crs
+    population_masked_high,
+    population_masked_transform,
+    aedes_masked,
+    aedes_masked_transform,
+    city_polygons.crs,
+    resampling=Resampling.sum
 )
 print(f"{population_masked_low.shape=}")
 
