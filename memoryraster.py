@@ -12,28 +12,47 @@ These functions are intended to make working with rasters in Python as easy to
 use as R's terra package.
 """
 
-import os
-import logging
-import tempfile
+from __future__ import annotations
+import copy
 import dataclasses
-from typing import Any
 from pathlib import Path
 
+import affine
 import rasterio
 import geopandas as gpd
 import numpy as np
-import numpy.typing as npt
 import rasterio.mask
-from rasterio.crs import CRS
-from rasterio.warp import calculate_default_transform, reproject, Resampling
+import rasterio.enums
+import rasterio.plot
+from rasterio.io import MemoryFile
+from rasterio.warp import calculate_default_transform, reproject
+
+
+DEFAULT_COLORMAP = "GnBu"
+
+
+def get_numpy_dtype(t: str):
+    match t:
+        case "float64":
+            return np.float64
+        case "float32":
+            return np.float32
+        case "int32":
+            return np.int32
+        case "uint32":
+            return np.uint32
+        case _:
+            return np.float64
+
 
 @dataclasses.dataclass
 class MemoryRaster:
-
-    data: npt.ArrayLike
-    transform: Any  # TODO: Make strict type
-    crs: str
+    data: np.ndarray | np.ma.MaskedArray
+    transform: affine.Affine
+    crs: str | None
     nodata: int | float
+    origin_path: Path | None = None
+    dtype: str = "float64"
 
     @property
     def shape(self):
@@ -47,121 +66,161 @@ class MemoryRaster:
     def height(self):
         return self.shape[0]
 
-    def read(self, crs: str = "EPSG:4326"):
+    @property
+    def profile(self):
+        return {
+            "transform": self.transform,
+            "width": self.width,
+            "height": self.height,
+            "crs": self.crs,
+            "count": 1,
+            "dtype": self.dtype,
+        }
+
+    def min(self) -> float:
+        return np.ma.min(self.data)
+
+    def max(self) -> float:
+        return np.ma.max(self.data)
+
+    def sum(self) -> float:
+        return np.ma.sum(self.data)
+
+    def __repr__(self):
+        return (
+            f"<MemoryRaster {self.shape} CRS={self.crs} "
+            f"min={self.data.min()} max={self.data.max()} "
+            f"NODATA={self.nodata} file={self.origin_path!r}\n"
+            f"  transform={self.transform}>"
+        )
+
+    @staticmethod
+    def read(
+        file: str | Path,
+        crs: str | None = None,
+        resampling: rasterio.enums.Resampling = rasterio.enums.Resampling.bilinear,
+    ):
         "Reads from a file supported by rasterio"
 
-def convert_crs(
-    file: str | Path, dst_crs: str = "EPSG:4326", resampling=Resampling.bilinear
-) -> str | Path:
-    "Reproject raster to different CRS"
-    with rasterio.open(file) as src:
-        if src.crs == dst_crs:  # no projection needed
-            logging.info(
-                f"No projection needed as source and destination CRS are identical: {src.crs}"
-            )
-            return file
-        transform, width, height = calculate_default_transform(
-            src.crs, dst_crs, src.width, src.height, *src.bounds
-        )
-        kwargs = src.meta.copy()
-        kwargs.update(
-            {"crs": dst_crs, "transform": transform, "width": width, "height": height}
-        )
-
-        handle, tmpfile = tempfile.mkstemp(suffix=".tif", prefix="dartagg")
-        os.close(handle)
-
-        with rasterio.open(tmpfile, "w", **kwargs) as dst:
-            for i in range(1, src.count + 1):
-                reproject(
-                    source=rasterio.band(src, i),
-                    destination=rasterio.band(dst, i),
-                    src_transform=src.transform,
-                    src_crs=src.crs,
-                    dst_transform=transform,
-                    dst_crs=dst_crs,
-                    resampling=resampling,
+        with rasterio.open(file) as src:
+            if src.count != 1:
+                raise ValueError("Only single band files are supported")
+            origin_path = Path(file)
+            if crs is None or src.crs == crs:
+                # No transformation requested or requested CRS is same as current CRS
+                return MemoryRaster(
+                    src.read(1), src.transform, src.crs, src.nodata, origin_path
                 )
-        return tmpfile
+            transform, width, height = calculate_default_transform(
+                src.crs, crs, src.width, src.height, *src.bounds
+            )
+            kwargs = src.meta.copy()
+            kwargs.update(
+                {"crs": crs, "transform": transform, "width": width, "height": height}
+            )
+            assert isinstance(width, int) and isinstance(height, int)
 
-def raster_mask(file: str | Path, geometry: gpd.GeoSeries) -> npt.ArrayLike:
-    """Mask raster file with a set of geometries
+            reprojected_data = np.zeros(
+                (height, width), dtype=get_numpy_dtype(kwargs["dtype"])
+            )
+            _, transform = reproject(
+                source=rasterio.band(src, 1),
+                destination=reprojected_data,
+                src_transform=src.transform,
+                src_crs=src.crs,
+                src_nodata=src.nodata,
+                dst_transform=transform,
+                dst_crs=crs,
+                resampling=resampling,
+            )
+            return MemoryRaster(
+                reprojected_data.squeeze(), transform, crs, src.nodata, origin_path
+            )
 
-    Parameters
-    ----------
-    file
-        Raster file to read
-    geometry
-        Geometry column of a GeoDataFrame, can be accessed by the .geometry attribute
+    def mask(
+        self, geometry: gpd.GeoDataFrame | gpd.GeoSeries, crop: bool = True
+    ) -> MemoryRaster:
+        """Mask raster file with a set of geometries
 
-    Returns
-    -------
-    np.array
-        Array of the same shape as the raster data, but with values outside the polygons
-        defined by the geometry set to NaN
-    """
+        Parameters
+        ----------
+        geometry
+            GeoDataFrame or GeoSeries
+        crop
+            Whether to crop the extent to the geometry specified, default=True. This
+            is passed directly to rasterio.mask.mask.
+        """
+        if isinstance(geometry, gpd.GeoDataFrame):
+            # reassign geometry to GeoSeries
+            geometry = geometry.geometry
+        with MemoryFile() as memfile:
+            with memfile.open(driver="GTiff", **self.profile) as src:
+                src.write(self.data, 1)
+            with memfile.open() as src:
+                masked, transform = rasterio.mask.mask(src, geometry, crop=crop)
+                return MemoryRaster(
+                    np.ma.masked_equal(masked.squeeze(), self.nodata),
+                    transform,
+                    self.crs,
+                    0,
+                )
 
-    print("\nraster_mask reading:", file)
-    with rasterio.open(file) as src:
-        masked, transform = rasterio.mask.mask(src, geometry, crop=True)
-        masked = masked.squeeze()
-        masked[masked == src.nodata] = 0
-        print("\tcrs:", src.crs)
-        print("\tbounds:", src.bounds)
-    print("\ttransform:", transform)
-    print("\tshape:", masked.shape)
-    return masked, transform
+    def plot(self, cmap: str = DEFAULT_COLORMAP, fill_nodata=0, **kwargs):
+        if fill_nodata is None:
+            return rasterio.plot.show(
+                self.data, transform=self.transform, cmap=cmap, **kwargs
+            )
+        else:
+            return rasterio.plot.show(
+                np.ma.filled(self.data, fill_nodata),
+                transform=self.transform,
+                cmap=cmap,
+                **kwargs,
+            )
 
-def resample_to_destination(
-    source_data: npt.ArrayLike,
-    source_transform,
-    destination: npt.ArrayLike,
-    destination_transform,
-    crs: CRS | str,
-    resampling,
-) -> npt.ArrayLike:
-    """Resamples source raster to match destination mask
+    def astype(self, t) -> MemoryRaster:
+        out = copy.deepcopy(self)
+        out.data = out.data.astype(t)
+        out.dtype = t.__name__
+        return out
 
-    NOTE: This function is not working at the moment
+    def resample(
+        self,
+        dst: MemoryRaster,
+        resampling: rasterio.enums.Resampling,
+    ) -> MemoryRaster:
+        """Resamples source raster to match destination mask
 
-    Parameters
-    ----------
-    source_data
-        Source raster file
-    source_transform
-        Source transform function
-    destination
-        Destination raster data as a numpy array, this is only used to get the shape
-    destination_transform
-        Destination transform
-    target_crs
-        Target CRS
-    bounds
-         Geometry bounds
-    resampling
-        Resampling method, one of `rasterio.enums.Resampling`
+        NOTE: This function is not working at the moment
 
-    Returns
-    -------
-    np.array
-        Resampled raster data in an array
-    """
-    print("Resampling using:", resampling)
-    # drop the first index (1)
-    height, width = destination.shape  # type: ignore
-    assert isinstance(width, int) and isinstance(height, int)
-    # Create an empty array to hold the resampled data
-    resampled_data = np.zeros((height, width), dtype=np.float32)
+        Parameters
+        ----------
+        dst
+            Destination MemoryRaster
+        resampling
+            Resampling method, one of `rasterio.enums.Resampling`
+        """
+        print("Resampling using:", resampling)
+        # drop the first index (1)
+        height, width = dst.shape  # type: ignore
+        assert isinstance(width, int) and isinstance(height, int)
+        # Create an empty array to hold the resampled data
+        resampled_data = np.zeros((height, width), dtype=get_numpy_dtype(self.dtype))
 
-    # Perform the resampling using reproject function
-    reproject(
-        source=source_data,
-        destination=resampled_data,
-        src_transform=source_transform,
-        src_crs=crs,
-        dst_transform=destination_transform,
-        dst_crs=crs,
-        resampling=resampling,  # Choose resampling method (nearest, bilinear, etc.)
-    )
-    return resampled_data
+        reproject(
+            source=np.ma.filled(
+                self.data, 0
+            ),  # replace nodata with 0 before resampling
+            destination=resampled_data,
+            src_transform=self.transform,
+            src_crs=self.crs,
+            dst_transform=dst.transform,
+            dst_crs=dst.crs,
+            resampling=resampling,  # Choose resampling method (nearest, bilinear, etc.)
+        )
+        return MemoryRaster(
+            np.ma.masked_equal(resampled_data, self.nodata), dst.transform, dst.crs, 0
+        )
 
+    def zonal_stats(self, geometry: gpd.GeoDataFrame, **kwargs):
+        "Calculate zonal statistics using exactextract"
