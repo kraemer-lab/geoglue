@@ -122,8 +122,7 @@ class ERA5:
     ) -> ERA5Aggregated:
         da = self.get_variable(variable)
         min_date = da.valid_time.min().dt.date.item(0)
-        # TODO: max_date = da.valid_time.max().dt.date.item(0)
-        max_date = min_date
+        max_date = da.valid_time.max().dt.date.item(0)
 
         # Empty dataframe with output columns
         out = pd.DataFrame(data=[], columns=self.admin_cols + ["value", "date"])  # type: ignore
