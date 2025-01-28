@@ -27,11 +27,11 @@ class GADM:
     @staticmethod
     def list_admin_cols(i) -> list[str]:
         cols = []
-        for k in range(i + 1):
+        for k in range(1, i + 1):
             cols.extend(
                 [
                     it + "_" + str(k)
-                    for it in ["GID", "NAME", "NL_NAME", "VARNAME", "TYPE"]
+                    for it in ["GID", "NAME"]
                 ]
             )
         return cols
