@@ -71,7 +71,6 @@ class ERA5:
     ):
         self.statistic = statistic
         self.admin_level = admin_level
-        self.statistic = statistic
         self.geom = GADM(country_iso3)[admin_level]
         self.admin_cols = GADM.list_admin_cols(admin_level)
         self.dataset = xr.open_dataset(filename)
@@ -122,7 +121,7 @@ class ERA5:
                 operation,
                 weights=self.population,
                 include_cols=self.admin_cols,
-            ).rename(columns={"mean": "value"})
+            ).rename(columns={"weighted_mean": "value"})
             df["date"] = date
             out = pd.concat([out, df])
         out["metric"] = f"era5.{variable}.{self.statistic}"
