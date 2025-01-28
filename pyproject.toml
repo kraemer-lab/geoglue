@@ -10,10 +10,15 @@ requires-python = ">=3.12"
 dependencies = [
     "exactextract>=0.2.0",
     "geopandas>=1.0.1",
+    "netcdf4>=1.7.2",
     "rasterio>=1.4.3",
+    "requests>=2.32.3",
     "tqdm>=4.67.1",
     "xarray>=2025.1.1",
 ]
+
+[project.optional-dependencies]
+notebook = ["jupyterlab"]
 
 [build-system]
 requires = ["hatchling"]
