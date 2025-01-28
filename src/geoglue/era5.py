@@ -8,12 +8,14 @@ resample and aggregate data to administrative levels obtained from GADM
 
 from __future__ import annotations
 
+import datetime
 from typing import Literal
 from pathlib import Path
 from functools import cache
 from dataclasses import dataclass
 
 import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
 import geopandas as gpd
@@ -42,13 +44,18 @@ class ERA5Aggregated:
 
     def select(self, at: str):
         if self.temporal_scope == "weekly":
-            return self.data[self.data.date == at]
-        else:
             return self.data[self.data.isoweek == at]
+        else:
+            at = datetime.date.fromisoformat(at)
+            return self.data[self.data.date.dt.date == at]
 
     def plot(self, at: str):
-        plot_data = self.select(at)
-        return plot_data.merge(self.geometry).plot()
+        df = gpd.GeoDataFrame(self.select(at).merge(self.geometry))
+        ax = df.plot("value", legend=True)
+        ax.set_xlabel("longitude")
+        ax.set_ylabel("latitude")
+        ax.set_title(df.metric.unique()[0])
+        plt.show()
 
     def weekly(self) -> ERA5Aggregated:
         df = (
@@ -65,16 +72,24 @@ class ERA5:
     def __init__(
         self,
         filename: str | Path,
-        country_iso3: str,
+        iso3: str,
         admin_level: int,
         statistic: Literal["daily_mean", "daily_max", "daily_min"],
     ):
+        self.filename = filename
         self.statistic = statistic
         self.admin_level = admin_level
-        self.geom = GADM(country_iso3)[admin_level]
+        self.iso3 = iso3
+        self.geom = GADM(iso3)[admin_level]
         self.admin_cols = GADM.list_admin_cols(admin_level)
         self.dataset = xr.open_dataset(filename)
         self.variables = [v for v in self.dataset.variables]
+
+    def __repr__(self):
+        return (
+            f"<ERA5 iso3={self.iso3} admin_level={self.admin_level} "
+            f"statistic={self.statistic} filename={self.filename!r}>"
+        )
 
     def set_population(self, raster: MemoryRaster):
         weather = self.get_variable("2m_temperature").isel(valid_time=0)
