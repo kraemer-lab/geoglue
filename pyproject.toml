@@ -1,0 +1,20 @@
+[project]
+name = "geoglue"
+version = "0.1.0"
+description = "Glue functions to help with geospatial data fetch and aggregation"
+readme = "README.md"
+authors = [
+    { name = "Abhishek Dasgupta", email = "abhishek.dasgupta@dtc.ox.ac.uk" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "exactextract>=0.2.0",
+    "geopandas>=1.0.1",
+    "rasterio>=1.4.3",
+    "tqdm>=4.67.1",
+    "xarray>=2025.1.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
