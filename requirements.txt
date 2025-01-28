@@ -1,4 +1,0 @@
-geopandas
-rasterio
-exactextract
-cdsapi
