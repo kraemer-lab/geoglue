@@ -46,8 +46,8 @@ class ERA5Aggregated:
         if self.temporal_scope == "weekly":
             return self.data[self.data.isoweek == at]
         else:
-            at = datetime.date.fromisoformat(at)
-            return self.data[self.data.date.dt.date == at]
+            at_date = datetime.date.fromisoformat(at)
+            return self.data[self.data.date.dt.date == at_date]
 
     def plot(self, at: str):
         df = gpd.GeoDataFrame(self.select(at).merge(self.geometry))
