@@ -68,7 +68,7 @@ class ERA5:
         return data.sel(longitude=extent_long, latitude=extent_lat)
 
     def zonal_daily(
-        self, variable: str, operation: str = "mean(coverage_weight=area_spherical_m2)"
+        self, variable: str, operation: str = "weighted_mean(coverage_weight=area_spherical_m2)"
     ) -> pd.DataFrame:
         da = self.era5_raster(variable)
         min_date = da.valid_time.min().dt.date.item(0)
