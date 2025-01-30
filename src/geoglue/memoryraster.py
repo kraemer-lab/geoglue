@@ -42,18 +42,9 @@ def grid_size(da: xr.DataArray, axis: str) -> float:
 
 
 def get_numpy_dtype(t: str):
-    match t:
-        case "float64":
-            return np.float64
-        case "float32":
-            return np.float32
-        case "int32":
-            return np.int32
-        case "uint32":
-            return np.uint32
-        case _:
-            return np.float64
-
+    if t in ["float64", "float32", "int32", "uint32"]:
+        return getattr(np, t)
+    return np.float64
 
 @dataclasses.dataclass
 class MemoryRaster:
