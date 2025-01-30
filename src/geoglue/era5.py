@@ -88,6 +88,10 @@ class ERA5Aggregated:
             at_date = datetime.date.fromisoformat(at)
             return self.data[self.data.date.dt.date == at_date]
 
+    def select_values(self, at: str):
+        data = self.select(at)
+        return data.value.reset_index(drop=True)
+
     def plot(self, at: str):
         df = gpd.GeoDataFrame(self.select(at).merge(self.geometry))
         ax = df.plot("value", legend=True)
@@ -97,13 +101,14 @@ class ERA5Aggregated:
         plt.show()
 
     def weekly(self) -> ERA5Aggregated:
+        metric = self.data.metric.unique().tolist()[0]
         df = (
             self.data.groupby(GADM.list_admin_cols(self.admin_level) + ["isoweek"])
             .value.mean()
             .reset_index()
             .sort_values("isoweek")
         )
-        df["metric"] += ".weekly_mean"
+        df["metric"] = metric + ".weekly_mean"
         return ERA5Aggregated(df, self.geometry, self.admin_level, "weekly")
 
 
@@ -122,16 +127,24 @@ class ERA5:
         self.geom = GADM(iso3)[admin_level]
         self.admin_cols = GADM.list_admin_cols(admin_level)
         self.dataset = xr.open_dataset(filename)
-        self.variables = [v for v in self.dataset.variables]
+        self._variables: list[str] = [
+            INVERSE_VARIABLE_MAPPINGS.get(str(v), v)
+            for v in self.dataset.variables
+            if v not in OMIT_VARIABLES
+        ]
 
     def __repr__(self):
         return (
-            f"<ERA5 iso3={self.iso3} admin_level={self.admin_level} "
-            f"statistic={self.statistic} filename={self.filename!r}>"
+            f"ERA5 {self.iso3} admin_level={self.admin_level} statistic={self.statistic}\n"
+            f"filename  = {self.filename!r}\nvariables = {', '.join(self.variables)}"
         )
 
+    @property
+    def variables(self) -> list[str]:
+        return self._variables
+
     def set_population(self, raster: MemoryRaster):
-        weather = self.get_variable("2m_temperature").isel(valid_time=0)
+        weather = self[self.variables[0]].isel(valid_time=0)
         self._population_original = raster
         _population_masked_high = self._population_original.mask(self.geom).astype(
             np.float32
@@ -142,8 +155,8 @@ class ERA5:
         )
 
     @cache
-    def get_variable(self, variable: str) -> xr.DataArray:
-        varname = ERA5_VARIABLE_MAPPINGS.get(variable, variable)
+    def __getitem__(self, variable: str) -> xr.DataArray:
+        varname = VARIABLE_MAPPINGS.get(variable, variable)
         data = self.dataset[varname]
 
         # ERA5 stores longitude from the 0 to 360 scale
@@ -157,28 +170,39 @@ class ERA5:
     def zonal_daily(
         self,
         variable: str,
-        operation: str = "weighted_mean(coverage_weight=area_spherical_m2)",
+        operation: str = "mean(coverage_weight=area_spherical_m2)",
+        weighted: bool = True,
         min_date: datetime.date | None = None,
         max_date: datetime.date | None = None,
     ) -> ERA5Aggregated:
-        da = self.get_variable(variable)
+        da = self[variable]
+        if weighted:
+            operation = "weighted_" + operation
         min_date = min_date or da.valid_time.min().dt.date.item(0)
         max_date = max_date or da.valid_time.max().dt.date.item(0)
         assert max_date >= min_date, "End date must be later than start date"
 
-        exactextract_output_column = re.match(r"(\w+)(?=\()", operation).group(1)
+        exactextract_output_column = re.match(r"(\w+)(?=\()", operation).group(1)  # type: ignore
         # Empty dataframe with output columns
-        out = pd.DataFrame(data=[], columns=self.admin_cols + ["value", "date"])  # type: ignore
+        out = pd.DataFrame(data=[], columns=self.admin_cols + ["value", "date"])
 
         for date in tqdm(pd.date_range(min_date, max_date, inclusive="both")):
             arr = da.sel(valid_time=date.isoformat())
             rast = MemoryRaster.from_xarray(arr)
-            df = rast.zonal_stats(
-                self.geom,
-                operation,
-                weights=self.population,
-                include_cols=self.admin_cols,
-            ).rename(columns={exactextract_output_column: "value"})
+            if weighted:
+                df = rast.zonal_stats(
+                    self.geom,
+                    operation,
+                    weights=self.population,
+                    include_cols=self.admin_cols,
+                ).rename(columns={exactextract_output_column: "value"})
+            else:
+                df = rast.zonal_stats(
+                    self.geom,
+                    operation,
+                    include_cols=self.admin_cols,
+                ).rename(columns={exactextract_output_column: "value"})
+
             df["date"] = date
             out = pd.concat([out, df])
         out["metric"] = f"era5.{variable}.{self.statistic}"
@@ -187,4 +211,4 @@ class ERA5:
             + "-W"
             + out["date"].dt.isocalendar().week.astype(str).str.zfill(2)
         )
-        return ERA5Aggregated(out, self.geom, self.admin_level, "daily")
+        return ERA5Aggregated(out, self.geom, self.admin_level, "daily", weighted)
