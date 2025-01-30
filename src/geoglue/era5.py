@@ -133,10 +133,13 @@ class ERA5:
         self,
         variable: str,
         operation: str = "weighted_mean(coverage_weight=area_spherical_m2)",
+        min_date: datetime.date | None = None,
+        max_date: datetime.date | None = None,
     ) -> ERA5Aggregated:
         da = self.get_variable(variable)
-        min_date = da.valid_time.min().dt.date.item(0)
-        max_date = da.valid_time.max().dt.date.item(0)
+        min_date = min_date or da.valid_time.min().dt.date.item(0)
+        max_date = max_date or da.valid_time.max().dt.date.item(0)
+        assert max_date >= min_date, "End date must be later than start date"
 
         exactextract_output_column = re.match(r"(\w+)(?=\()", operation).group(1)
         # Empty dataframe with output columns
