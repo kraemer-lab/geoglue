@@ -124,6 +124,7 @@ class ERA5:
         min_date = da.valid_time.min().dt.date.item(0)
         max_date = da.valid_time.max().dt.date.item(0)
 
+        exactextract_output_column = re.match(r"(\w+)(?=\()", operation).group(1)
         # Empty dataframe with output columns
         out = pd.DataFrame(data=[], columns=self.admin_cols + ["value", "date"])  # type: ignore
 
@@ -135,7 +136,7 @@ class ERA5:
                 operation,
                 weights=self.population,
                 include_cols=self.admin_cols,
-            ).rename(columns={"weighted_mean": "value"})
+            ).rename(columns={exactextract_output_column: "value"})
             df["date"] = date
             out = pd.concat([out, df])
         out["metric"] = f"era5.{variable}.{self.statistic}"
