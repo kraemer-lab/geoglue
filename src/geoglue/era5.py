@@ -8,6 +8,7 @@ resample and aggregate data to administrative levels obtained from GADM
 
 from __future__ import annotations
 
+import re
 import datetime
 from typing import Literal
 from pathlib import Path
@@ -25,7 +26,9 @@ from rasterio.enums import Resampling
 from .gadm import GADM
 from .memoryraster import MemoryRaster
 
-ERA5_VARIABLE_MAPPINGS = {"2m_temperature": "t2m"}
+VARIABLE_MAPPINGS: dict[str, str] = {"2m_temperature": "t2m"}
+INVERSE_VARIABLE_MAPPINGS: dict[str, str] = {v: k for k, v in VARIABLE_MAPPINGS.items()}
+OMIT_VARIABLES = ["number", "latitude", "longitude", "valid_time"]
 
 
 def get_extents(gdf: gpd.GeoDataFrame) -> tuple[slice, slice]:
@@ -41,20 +44,42 @@ class ERA5Aggregated:
     geometry: gpd.GeoDataFrame
     admin_level: int
     temporal_scope: Literal["weekly", "daily"]
+    weighted: bool = True
 
     @staticmethod
     def load(path: str | Path) -> ERA5Aggregated:
+        path = Path(path)
         data = pd.read_parquet(path)
 
         # Standard filename nomenclature is of the form ISO3-admin_level-metric.parquet
         iso3 = data.attrs.get("iso3")
         if iso3 is None:
-            iso3 = str(path).split("-")[1].upper()
+            iso3 = str(path.name).split("-")[0].upper()
         admin_level = int(data.attrs.get("admin_level", 0))
         if admin_level == 0:
-            admin_level = int(str(path).split("-")[2])
+            admin_level = int(str(path.name).split("-")[1])
         geom = GADM(iso3)[admin_level]
-        return ERA5Aggregated(data, geom, admin_level, "daily")
+        metric = data.metric.unique().tolist()[0]
+        temporal_scope = "weekly" if "weekly" in metric else "daily"
+        weighted = data.attrs.get("weighted", True)
+        return ERA5Aggregated(data, geom, admin_level, temporal_scope, weighted)
+
+    def with_data(self, data: pd.DataFrame) -> ERA5Aggregated:
+        return ERA5Aggregated(
+            data, self.geometry, self.admin_level, self.temporal_scope, self.weighted
+        )
+
+    def save(self, path: str | Path | None = None) -> None:
+        iso3 = (self.geometry.GID_0.unique().tolist()[0],)
+        metric = self.data.metric.unique().tolist()[0]
+        self.data.attrs = {
+            "iso3": iso3,
+            "admin_level": self.admin_level,
+            "temporal_scope": self.temporal_scope,
+            "weighted": self.weighted,
+        }
+        path = path or Path(f"{iso3}-{self.admin_level}-{metric}.parquet")
+        self.data.to_parquet(path, index=False)
 
     def select(self, at: str):
         if self.temporal_scope == "weekly":
