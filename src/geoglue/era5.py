@@ -42,6 +42,20 @@ class ERA5Aggregated:
     admin_level: int
     temporal_scope: Literal["weekly", "daily"]
 
+    @staticmethod
+    def load(path: str | Path) -> ERA5Aggregated:
+        data = pd.read_parquet(path)
+
+        # Standard filename nomenclature is of the form ISO3-admin_level-metric.parquet
+        iso3 = data.attrs.get("iso3")
+        if iso3 is None:
+            iso3 = str(path).split("-")[1].upper()
+        admin_level = int(data.attrs.get("admin_level", 0))
+        if admin_level == 0:
+            admin_level = int(str(path).split("-")[2])
+        geom = GADM(iso3)[admin_level]
+        return ERA5Aggregated(data, geom, admin_level, "daily")
+
     def select(self, at: str):
         if self.temporal_scope == "weekly":
             return self.data[self.data.isoweek == at]
