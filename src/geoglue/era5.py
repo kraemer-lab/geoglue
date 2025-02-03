@@ -155,17 +155,6 @@ class ERA5:
     def variables(self) -> list[str]:
         return self._variables
 
-    def set_population(self, raster: MemoryRaster):
-        weather = self[self.variables[0]].isel(valid_time=0)
-        self._population_original = raster
-        _population_masked_high = self._population_original.mask(self.geom).astype(
-            np.float32
-        )
-        # TODO: assumes weahter data is at a lower resolution than population
-        self.population = _population_masked_high.resample(
-            MemoryRaster.from_xarray(weather), Resampling.sum
-        )
-
     @cache
     def __getitem__(self, variable: str) -> xr.DataArray:
         varname = VARIABLE_MAPPINGS.get(variable, variable)
@@ -178,6 +167,23 @@ class ERA5:
         # crop to geometry extent
         extent_long, extent_lat = get_extents(self.geom)
         return data.sel(longitude=extent_long, latitude=extent_lat)
+
+    def resample(
+        self,
+        variable: str,
+        valid_time: int | datetime.date | str,
+        resampling: Resampling = Resampling.bilinear,
+    ) -> MemoryRaster:
+        match valid_time:
+            case str():
+                arr = self[variable].sel(valid_time=valid_time)
+            case datetime.date():
+                arr = self[variable].sel(valid_time=valid_time.isoformat())
+            case int():
+                arr = self[variable].isel(valid_time=valid_time)
+            case _:
+                raise TypeError(f"{valid_time=} is of incorrect type")
+        return MemoryRaster.from_xarray(arr).resample(self.population, resampling)
 
     def zonal_daily(
         self,
@@ -192,15 +198,17 @@ class ERA5:
             operation = "weighted_" + operation
         min_date = min_date or da.valid_time.min().dt.date.item(0)
         max_date = max_date or da.valid_time.max().dt.date.item(0)
-        assert max_date >= min_date, "End date must be later than start date"
+        assert max_date >= min_date, "End date must be later than start date"  # type: ignore
 
         exactextract_output_column = re.match(r"(\w+)(?=\()", operation).group(1)  # type: ignore
         # Empty dataframe with output columns
         out = pd.DataFrame(data=[], columns=self.admin_cols + ["value", "date"])
 
         for date in tqdm(pd.date_range(min_date, max_date, inclusive="both")):
-            arr = da.sel(valid_time=date.isoformat())
-            rast = MemoryRaster.from_xarray(arr)
+            # NOTE: Rate-limiting step, as each weather 2D time slice needs to
+            # be resampled to match the high resolution population grid
+            rast = self.resample(variable, date)
+            assert rast.shape == self.population.shape
             if weighted:
                 df = rast.zonal_stats(
                     self.geom,
