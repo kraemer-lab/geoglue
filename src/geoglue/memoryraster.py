@@ -46,6 +46,7 @@ def get_numpy_dtype(t: str):
         return getattr(np, t)
     return np.float64
 
+
 @dataclasses.dataclass
 class MemoryRaster:
     data: np.ndarray | np.ma.MaskedArray | xr.DataArray
@@ -110,7 +111,7 @@ class MemoryRaster:
             da[c_longitude].min(),
             da[c_latitude].max(),
             grid_size(da, c_longitude),
-           grid_size(da, c_latitude),
+            grid_size(da, c_latitude),
         )
         return MemoryRaster(
             da, transform, "EPSG:4326", nodata=nodata or 0, dtype=da.dtype.name
@@ -130,8 +131,13 @@ class MemoryRaster:
             origin_path = Path(file)
             if crs is None or src.crs == crs:
                 # No transformation requested or requested CRS is same as current CRS
+                data = src.read(1)
                 return MemoryRaster(
-                    src.read(1), src.transform, src.crs, src.nodata, origin_path
+                    np.ma.masked_equal(data, src.nodata),
+                    src.transform,
+                    src.crs,
+                    src.nodata,
+                    origin_path,
                 )
             transform, width, height = calculate_default_transform(
                 src.crs, crs, src.width, src.height, *src.bounds
