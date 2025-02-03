@@ -112,22 +112,34 @@ class ERA5Aggregated:
         return ERA5Aggregated(df, self.geometry, self.admin_level, "weekly")
 
 
+def infer_statistic(ds: xr.Dataset) -> str | None:
+    "Infer temporal aggregation statistic from ERA5 NetCDF file"
+
+    last_line_history = ds.attrs["history"].split("\n")[-1]
+    # Last line in the history attribute is of this form:
+    # earthkit.transforms.aggregate.temporal.daily_reduce(2m_temperature_stream-oper, how=mean, **{'time_shift': {'hours': 7}, 'remove_partial_periods': True})
+    # refers to the parameters passed to the daily_reduce function:
+    # https://earthkit-transforms.readthedocs.io/en/latest/_api/transforms/aggregate/temporal/index.html#transforms.aggregate.temporal.daily_reduce
+    if (m := re.match(r".*how=(\w+)", last_line_history)) and "daily_reduce" in m[0]:
+        return "daily_" + m[1]
+    return None
+
+
 class ERA5:
     def __init__(
         self,
         filename: str | Path,
-        iso3: str,
-        admin_level: int,
-        statistic: Literal["daily_mean", "daily_max", "daily_min"],
+        admin_level: tuple[str, int],
+        population: MemoryRaster,
     ):
         self.filename = filename
-        self.statistic = statistic
-        self.admin_level = admin_level
-        self.iso3 = iso3
-        self.geom = GADM(iso3)[admin_level]
-        self.admin_cols = GADM.list_admin_cols(admin_level)
+        self.iso3, self.admin_level = admin_level
+        self.geom = GADM(self.iso3)[self.admin_level]
+        self.admin_cols = GADM.list_admin_cols(self.admin_level)
         self.dataset = xr.open_dataset(filename)
-        self._variables: list[str] = [
+        self.statistic = infer_statistic(self.dataset) or "unknown"
+        self.population = population.mask(self.geom).astype(np.float32)
+        self._variables: list[str] = [  # type: ignore
             INVERSE_VARIABLE_MAPPINGS.get(str(v), v)
             for v in self.dataset.variables
             if v not in OMIT_VARIABLES
