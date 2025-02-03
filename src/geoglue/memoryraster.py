@@ -34,7 +34,7 @@ from rasterio.transform import from_origin
 from rasterio.io import MemoryFile
 from rasterio.warp import calculate_default_transform, reproject
 
-DEFAULT_COLORMAP = "GnBu"
+DEFAULT_COLORMAP = "viridis"
 
 
 def grid_size(da: xr.DataArray, axis: str) -> float:
