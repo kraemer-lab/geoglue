@@ -161,15 +161,27 @@ class MemoryRaster:
                 dst_crs=crs,
                 resampling=resampling,
             )
+            data = reprojected_data.squeeze()
             return MemoryRaster(
-                reprojected_data.squeeze(), transform, crs, src.nodata, origin_path
+                np.ma.masked_equal(data, src.nodata),
+                transform,
+                crs,
+                src.nodata,
+                origin_path,
             )
 
     @contextmanager
-    def as_rasterio(self):
+    def as_rasterio(self, zfill: bool = False):
         with MemoryFile() as memfile:
-            with memfile.open(**self.profile) as dataset:
-                dataset.write(np.expand_dims(self.data, axis=0))
+            if zfill and np.ma.isMaskedArray(self.data):
+                data = self.data.filled(0)  # type: ignore
+                profile = copy.deepcopy(self.profile)
+                del profile["nodata"]
+            else:
+                data = self.data
+                profile = self.profile
+            with memfile.open(**profile) as dataset:
+                dataset.write(np.expand_dims(data, axis=0))
 
             with memfile.open() as dataset:
                 yield dataset
@@ -199,10 +211,10 @@ class MemoryRaster:
                     np.ma.masked_equal(masked.squeeze(), self.nodata),
                     transform,
                     self.crs,
-                    0,
+                    self.nodata,
                 )
 
-    def plot(self, cmap: str = DEFAULT_COLORMAP, fill_nodata=0, **kwargs):
+    def plot(self, cmap: str = DEFAULT_COLORMAP, fill_nodata=None, **kwargs):
         if fill_nodata is None:
             return rasterio.plot.show(
                 self.data, transform=self.transform, cmap=cmap, **kwargs
@@ -237,7 +249,6 @@ class MemoryRaster:
         resampling
             Resampling method, one of `rasterio.enums.Resampling`
         """
-        print("Resampling using:", resampling)
         # drop the first index (1)
         height, width = dst.shape  # type: ignore
         assert isinstance(width, int) and isinstance(height, int)
@@ -270,7 +281,7 @@ class MemoryRaster:
 
         with self.as_rasterio() as raster:
             if weights:
-                with weights.as_rasterio() as weights_raster:
+                with weights.as_rasterio(zfill=True) as weights_raster:
                     out = exactextract.exact_extract(
                         raster,
                         geometry,
