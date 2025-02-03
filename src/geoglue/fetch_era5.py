@@ -8,7 +8,8 @@ import logging
 import cdsapi
 
 
-def fetch_era5():
+def fetch_era5(statistic: str):
+    assert statistic in ["daily_mean", "daily_max", "daily_min"]
     dataset = "derived-era5-single-levels-daily-statistics"
     request = {
         "product_type": "reanalysis",
@@ -33,7 +34,7 @@ def fetch_era5():
             "28", "29", "30",
             "31"
         ],
-        "daily_statistic": "daily_mean",
+        "daily_statistic": statistic,
         "time_zone": "utc+07:00",
         "frequency": "6_hourly"
     }
@@ -42,4 +43,4 @@ def fetch_era5():
     client.retrieve(dataset, request).download()
 
 if __name__ == "__main__":
-    fetch_era5()
+    fetch_era5("daily_mean")
