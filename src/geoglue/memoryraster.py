@@ -34,11 +34,13 @@ from rasterio.transform import from_origin
 from rasterio.io import MemoryFile
 from rasterio.warp import calculate_default_transform, reproject
 
+from .types import CDOGrid
+
 DEFAULT_COLORMAP = "viridis"
 
 
 def grid_size(da: xr.DataArray, axis: str) -> float:
-    return abs(da[axis][1] - da[axis][0])
+    return abs(float(da[axis][1] - da[axis][0]))
 
 
 def get_numpy_dtype(t: str):
@@ -81,6 +83,35 @@ class MemoryRaster:
             "driver": self.driver,
             "nodata": self.nodata,
         }
+
+    @property
+    def cdo_grid(self) -> CDOGrid:
+        gridtype = "lonlat"
+        assert "4326" in str(self.crs), (
+            "Only EPSG:4326 (WGS84) CRS latitude/longitude is supported.\n"
+            "Reproject CRS by passing crs='EPSG:4326' to MemoryRaster"
+        )
+        ysize, xsize = self.shape
+        if isinstance(self.data, xr.DataArray):
+            xinc = grid_size(self.data, "longitude")
+            yinc = grid_size(self.data, "latitude")
+            xfirst = float(self.data["longitude"].min())
+            yfirst = float(self.data["latitude"].min())
+        else:
+            xinc = self.transform[0]
+            # Latitude is descending, so the latitude increment is negative
+            yinc = abs(self.transform[4])
+            xfirst = self.transform[2]
+            yfirst = self.transform[5] + self.transform[4] * ysize
+        return CDOGrid(
+            gridtype=gridtype,
+            xfirst=xfirst,
+            xinc=xinc,
+            xsize=xsize,
+            yfirst=yfirst,
+            yinc=yinc,
+            ysize=ysize,
+        )
 
     def min(self) -> float:
         return np.ma.min(self.data)
