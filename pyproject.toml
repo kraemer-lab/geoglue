@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "cdo>=1.6.1",
     "exactextract>=0.2.0",
     "fastparquet>=2024.11.0",
     "geopandas>=1.0.1",

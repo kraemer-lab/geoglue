@@ -145,6 +145,18 @@ css = [
 ]
 
 [[package]]
+name = "cdo"
+version = "1.6.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "six" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e2/c8/717b1beb0c997aeb9eaf6bd98ba5514d5de716e679bb0b173b5c867c2958/cdo-1.6.1-py3-none-any.whl", hash = "sha256:772abda398b6a102ff55be19fa7154c65af0bf2132d133bdea651e57a5ba895f", size = 16286 },
+]
+
+[[package]]
 name = "certifi"
 version = "2024.12.14"
 source = { registry = "https://pypi.org/simple" }
@@ -537,6 +549,7 @@ name = "geoglue"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cdo" },
     { name = "exactextract" },
     { name = "fastparquet" },
     { name = "geopandas" },
@@ -556,6 +569,7 @@ notebook = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cdo", specifier = ">=1.6.1" },
     { name = "exactextract", specifier = ">=0.2.0" },
     { name = "fastparquet", specifier = ">=2024.11.0" },
     { name = "geopandas", specifier = ">=1.0.1" },
