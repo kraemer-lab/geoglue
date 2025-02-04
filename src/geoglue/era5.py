@@ -137,6 +137,18 @@ class ERA5:
         self.geom = GADM(self.iso3)[self.admin_level]
         self.admin_cols = GADM.list_admin_cols(self.admin_level)
         self.dataset = xr.open_dataset(filename)
+
+        # ERA5 stores longitude from the 0 to 360 scale
+        # with 0 at the Greenwich meridian, counting east
+        self.dataset.coords["longitude"] = (
+            self.dataset.coords["longitude"] + 180
+        ) % 360 - 180
+        self.dataset = self.dataset.sortby(self.dataset.longitude)
+
+        # Crop data to geometry extents
+        extent_long, extent_lat = get_extents(self.geom)
+        self.dataset = self.dataset.sel(longitude=extent_long, latitude=extent_lat)
+
         self.statistic = infer_statistic(self.dataset) or "unknown"
         self.population = population.mask(self.geom).astype(np.float32)
         self._variables: list[str] = [  # type: ignore
@@ -155,18 +167,14 @@ class ERA5:
     def variables(self) -> list[str]:
         return self._variables
 
+    def to_netcdf(self, *args, **kwargs) -> xr.Dataset:
+        "Save NetCDF data"
+        self.dataset.to_netcdf(*args, **kwargs)
+
     @cache
     def __getitem__(self, variable: str) -> xr.DataArray:
         varname = VARIABLE_MAPPINGS.get(variable, variable)
-        data = self.dataset[varname]
-
-        # ERA5 stores longitude from the 0 to 360 scale
-        # with 0 at the Greenwich meridian, counting east
-        data.coords["longitude"] = (data.coords["longitude"] + 180) % 360 - 180
-        data = data.sortby(data.longitude)
-        # crop to geometry extent
-        extent_long, extent_lat = get_extents(self.geom)
-        return data.sel(longitude=extent_long, latitude=extent_lat)
+        return self.dataset[varname]
 
     def resample(
         self,
