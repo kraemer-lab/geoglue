@@ -34,7 +34,7 @@ from rasterio.transform import from_origin
 from rasterio.io import MemoryFile
 from rasterio.warp import calculate_default_transform, reproject
 
-from .types import CDOGrid
+from .types import CdoGriddes
 
 DEFAULT_COLORMAP = "viridis"
 
@@ -85,13 +85,18 @@ class MemoryRaster:
         }
 
     @property
-    def cdo_grid(self) -> CDOGrid:
+    def griddes(self) -> CdoGriddes:
         gridtype = "lonlat"
         assert "4326" in str(self.crs), (
             "Only EPSG:4326 (WGS84) CRS latitude/longitude is supported.\n"
             "Reproject CRS by passing crs='EPSG:4326' to MemoryRaster"
         )
+        xname = xlongname = "longitude"
+        xunits = "degrees_east"
+        yname = ylongname = "latitude"
+        yunits = "degrees_north"
         ysize, xsize = self.shape
+        gridsize = ysize * xsize
         if isinstance(self.data, xr.DataArray):
             xinc = grid_size(self.data, "longitude")
             yinc = grid_size(self.data, "latitude")
@@ -103,14 +108,21 @@ class MemoryRaster:
             yinc = abs(self.transform[4])
             xfirst = self.transform[2]
             yfirst = self.transform[5] + self.transform[4] * ysize
-        return CDOGrid(
+        return CdoGriddes(
             gridtype=gridtype,
+            gridsize=gridsize,
+            xsize=xsize,
+            ysize=ysize,
+            xname=xname,
+            xlongname=xlongname,
+            xunits=xunits,
+            yname=yname,
+            ylongname=ylongname,
+            yunits=yunits,
             xfirst=xfirst,
             xinc=xinc,
-            xsize=xsize,
             yfirst=yfirst,
             yinc=yinc,
-            ysize=ysize,
         )
 
     def min(self) -> float:
@@ -138,6 +150,7 @@ class MemoryRaster:
         nodata: int | float | None = None,
     ) -> MemoryRaster:
         "Creates MemoryRaster from xarray, assumes EPSG:4326"
+        da = da.sortby(da.latitude, ascending=False)
         transform = from_origin(
             da[c_longitude].min(),
             da[c_latitude].max(),
