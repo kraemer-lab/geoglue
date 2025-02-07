@@ -18,13 +18,11 @@ from dataclasses import dataclass
 
 import cdo
 import numpy as np
-import exactextract
 import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
 import geopandas as gpd
 from tqdm import tqdm
-from rasterio.enums import Resampling
 
 from .types import CdoGriddes, CdoResampling
 from .gadm import GADM
@@ -41,7 +39,7 @@ _cdo = cdo.Cdo()
 def get_extents(gdf: gpd.GeoDataFrame) -> tuple[slice, slice]:
     min_long, min_lat, max_long, max_lat = gdf.geometry.total_bounds
     return slice(int(min_long), int(max_long) + 1), slice(
-        int(min_lat), int(max_lat) + 1
+        int(max_lat) + 1, int(min_lat)
     )
 
 
