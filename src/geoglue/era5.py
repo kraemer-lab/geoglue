@@ -172,7 +172,7 @@ class DatasetZonalStatistics:
         if time_col is None:
             matching_cols = [
                 c
-                for c in self.dataset.variables
+                for c in map(str, self.dataset.variables)
                 if c.endswith("time") or c.startswith("time") or c == "t"
             ]
             if matching_cols:
@@ -199,7 +199,7 @@ class DatasetZonalStatistics:
                 self.dataset.coords["longitude"] + 180
             ) % 360 - 180
             self.dataset = self.dataset.sortby(self.dataset.longitude)
-
+        self.dataset = self.dataset.sortby(self.dataset.latitude, ascending=False)
         # Crop data to geometry extents
         extent_long, extent_lat = get_extents(self.geom)
         self.dataset = self.dataset.sel(longitude=extent_long, latitude=extent_lat)
@@ -214,14 +214,14 @@ class DatasetZonalStatistics:
     def variables(self) -> list[str]:
         return self._variables
 
-    def to_netcdf(self, path: str, fix_griddes: bool = True, **kwargs):
+    def to_netcdf(self, path: str, fix_griddes: bool = True):
         "Save NetCDF data"
         if not fix_griddes:
-            self.dataset.to_netcdf(path, **kwargs)
+            self.dataset.to_netcdf(path)
         else:
             with tempfile.NamedTemporaryFile(suffix=".nc") as f:
-                self.dataset.to_netcdf(f.name, **kwargs)
-                griddes = CdoGriddes.from_file(f.name, base=self.population.griddes)
+                self.dataset.to_netcdf(f.name)
+                griddes = CdoGriddes.from_file(f.name)
                 if griddes.gridtype == "generic":
                     griddes.gridtype = "lonlat"
                     with tempfile.NamedTemporaryFile(suffix=".txt") as grid_tmp:
@@ -287,11 +287,15 @@ class ERA5:
     def __init__(
         self,
         filename: str | Path,
-        admin_level: tuple[str, int],
+        country_admin: str,
         population: MemoryRaster,
     ):
         self.filename = filename
-        self.iso3, self.admin_level = admin_level
+        iso3, admin_level = country_admin.split("-")
+        self.iso3 = iso3.upper()
+        self.admin_level = int(admin_level)
+        if self.admin_level not in [1, 2, 3]:
+            raise ValueError(f"Not a valid {admin_level=}")
         self.geom = GADM(self.iso3)[self.admin_level]
         self.admin_cols = GADM.list_admin_cols(self.admin_level)
         self.dataset = xr.open_dataset(filename)
@@ -325,13 +329,13 @@ class ERA5:
     def variables(self) -> list[str]:
         return self._variables
 
-    def to_netcdf(self, path: str, fix_griddes: bool = True, **kwargs):
+    def to_netcdf(self, path: str, fix_griddes: bool = True):
         "Save NetCDF data"
         if not fix_griddes:
-            self.dataset.to_netcdf(path, **kwargs)
+            self.dataset.to_netcdf(path)
         else:
             with tempfile.NamedTemporaryFile(suffix=".nc") as f:
-                self.dataset.to_netcdf(f.name, **kwargs)
+                self.dataset.to_netcdf(f.name)
                 griddes = CdoGriddes.from_file(f.name, base=self.population.griddes)
                 if griddes.gridtype == "generic":
                     griddes.gridtype = "lonlat"
