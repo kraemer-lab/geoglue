@@ -23,8 +23,6 @@ class CdoGriddes:
     xsize: int
     ysize: int
     xname: str
-    xlongname: str
-    xunits: str
     yname: str
     ylongname: str
     yunits: str
@@ -32,6 +30,8 @@ class CdoGriddes:
     xinc: float
     yfirst: float
     yinc: float
+    xlongname: str = "longitude"
+    xunits: str = "degrees_east"
 
     def __str__(self) -> str:
         out = []
@@ -43,7 +43,7 @@ class CdoGriddes:
         return "\n".join(out)
 
     @staticmethod
-    def from_file(file: str | Path, base: CdoGriddes | None = None) -> CdoGriddes:
+    def from_file(file: str | Path, base: CdoGriddes | None = None, **kwargs) -> CdoGriddes:
         out = {}
         for line in _cdo.griddes(input=str(file)):
             if line.startswith("#"):
@@ -62,9 +62,11 @@ class CdoGriddes:
             new_out = copy.deepcopy(asdict(base))
             # override keys already found with keys in file
             new_out.update(out)
-            return CdoGriddes(**new_out)
         else:
-            return CdoGriddes(**out)
+            new_out = out
+        if kwargs:
+            new_out.update(kwargs)
+        return CdoGriddes(**out)
 
     def write(self, file: str | Path):
         Path(file).write_text(str(self))
