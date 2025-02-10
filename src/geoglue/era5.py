@@ -28,9 +28,8 @@ from .types import CdoGriddes, CdoResampling
 from .gadm import GADM
 from .memoryraster import MemoryRaster
 
-VARIABLE_MAPPINGS: dict[str, str] = {"2m_temperature": "t2m"}
-INVERSE_VARIABLE_MAPPINGS: dict[str, str] = {v: k for k, v in VARIABLE_MAPPINGS.items()}
-OMIT_VARIABLES = ["number", "latitude", "longitude", "valid_time"]
+VAR_TO_STDNAMES: dict[str, str] = {"t2m": "air_temperature"}
+STDNAMES_TO_VAR: dict[str, str] = {v: k for k, v in VAR_TO_STDNAMES.items()}
 
 
 _cdo = cdo.Cdo()
@@ -120,6 +119,9 @@ class ERA5Aggregated:
 def infer_statistic(ds: xr.Dataset) -> str | None:
     "Infer temporal aggregation statistic from ERA5 NetCDF file"
 
+    # daily_reduce functions by geoglue add a gg_statistic variable
+    if "gg_statistic" in ds.attrs:
+        return ds.attrs["gg_statistic"]
     last_line_history = ds.attrs["history"].split("\n")[-1]
     # Last line in the history attribute is of this form:
     # earthkit.transforms.aggregate.temporal.daily_reduce(2m_temperature_stream-oper, how=mean, **{'time_shift': {'hours': 7}, 'remove_partial_periods': True})
@@ -135,12 +137,15 @@ def resample(
     infile: str | Path,
     target: MemoryRaster,
     outfile: str | Path | None = None,
+    skip_exists=True,
 ) -> Path:
     "Resamples input file to output file using CDO's resampling to a target raster grid"
     if isinstance(infile, str):
         infile = Path(infile)
     if outfile is None:
         outfile = infile.parent / f"{infile.stem}_{resampling.name}.nc"
+    if Path(outfile).exists() and skip_exists:
+        return Path(outfile)
     with tempfile.NamedTemporaryFile(suffix=".txt") as griddes:
         Path(griddes.name).write_text(str(target.griddes))
 
@@ -155,8 +160,9 @@ def resample(
 def geom_plot(df: pd.DataFrame, geometry: gpd.GeoDataFrame, col: str = "value"):
     return gpd.GeoDataFrame(df.merge(geometry)).plot(col)
 
+
 class DatasetZonalStatistics:
-    """Calculates zonal statistics for a temporal dataset"""
+    """Calculates zonal statistics for a daily temporal dataset"""
 
     def __init__(
         self,
@@ -208,7 +214,9 @@ class DatasetZonalStatistics:
             self.weights = weights.mask(self.geom).astype(np.float32)
         else:
             self.weights = None
-        self._variables: list[str] = [v for v in self.dataset.variables]  # type: ignore
+        self._variables: list[str] = [
+            v for v in self.dataset.variables if v not in self.dataset.coords
+        ]  # type: ignore
 
     @property
     def variables(self) -> list[str]:
@@ -234,25 +242,25 @@ class DatasetZonalStatistics:
     def __getitem__(self, variable: str) -> xr.DataArray:
         return self.dataset[variable]
 
-    def zonal_daily(
+    def zonal_stats(
         self,
         variable: str,
         operation: str = "mean(coverage_weight=area_spherical_m2)",
         weighted: bool = True,
         min_date: datetime.date | None = None,
         max_date: datetime.date | None = None,
+        const_cols: dict[str, str] | None = None,
     ) -> ERA5Aggregated:
         da = self[variable]
         # shape after dropping time axis should be identical
-        print("SHAPE", da.shape)
-        assert (
-            da.shape[1:] == self.weights.shape
-        ), f"Variable shape {da.shape[1:]} and weights shape {self.weights.shape} must be identical"
         if weighted:
-            if not self.weighted:
+            if self.weights is None:
                 raise ValueError(
                     "Weighted zonal statistics requested but no weights supplied"
                 )
+            assert (
+                da.shape[1:] == self.weights.shape
+            ), f"Variable shape {da.shape[1:]} and weights shape {self.weights.shape} must be identical"
             operation = "weighted_" + operation
         min_date = min_date or da[self.time_col].min().dt.date.item(0)
         max_date = max_date or da[self.time_col].max().dt.date.item(0)
@@ -280,72 +288,60 @@ class DatasetZonalStatistics:
 
             df["date"] = date
             out = pd.concat([out, df])
+        if const_cols:
+            for c, v in const_cols.items():
+                out[c] = v
         return out
 
 
-class ERA5:
+class ERA5ZonalStatistics(DatasetZonalStatistics):
     def __init__(
         self,
-        filename: str | Path,
-        country_admin: str,
-        population: MemoryRaster,
+        filename: str,
+        admin: str,
+        weights: MemoryRaster | None = None,
+        resampling: CdoResampling = CdoResampling.remapbil,
     ):
+        iso3, level = admin.split("-")
+        level = int(level)
         self.filename = filename
-        iso3, admin_level = country_admin.split("-")
         self.iso3 = iso3.upper()
-        self.admin_level = int(admin_level)
-        if self.admin_level not in [1, 2, 3]:
-            raise ValueError(f"Not a valid {admin_level=}")
-        self.geom = GADM(self.iso3)[self.admin_level]
-        self.admin_cols = GADM.list_admin_cols(self.admin_level)
-        self.dataset = xr.open_dataset(filename)
-
-        # ERA5 stores longitude from the 0 to 360 scale
-        # with 0 at the Greenwich meridian, counting east
-        self.dataset.coords["longitude"] = (
-            self.dataset.coords["longitude"] + 180
-        ) % 360 - 180
-        self.dataset = self.dataset.sortby(self.dataset.longitude)
-
-        # Crop data to geometry extents
-        extent_long, extent_lat = get_extents(self.geom)
-        self.dataset = self.dataset.sel(longitude=extent_long, latitude=extent_lat)
-
-        self.statistic = infer_statistic(self.dataset) or "unknown"
-        self.population = population.mask(self.geom).astype(np.float32)
-        self._variables: list[str] = [  # type: ignore
-            INVERSE_VARIABLE_MAPPINGS.get(str(v), v)
-            for v in self.dataset.variables
-            if v not in OMIT_VARIABLES
-        ]
-
-    def __repr__(self):
-        return (
-            f"ERA5 {self.iso3} admin_level={self.admin_level} statistic={self.statistic}\n"
-            f"filename  = {self.filename!r}\nvariables = {', '.join(self.variables)}"
+        self.admin_level = level
+        gadm = GADM(iso3)
+        self.resampling = resampling
+        # perform resampling to weights grid if weights present
+        if weights:
+            resampled_file = resample(resampling, filename, weights)
+        else:
+            resampled_file = Path(filename)
+        ds = xr.open_dataset(resampled_file)
+        self.statistic = infer_statistic(ds)
+        super().__init__(
+            ds,
+            gadm[level],
+            weights,
+            include_cols=gadm.list_admin_cols(level),
+            time_col="valid_time",
         )
 
-    @property
-    def variables(self) -> list[str]:
-        return self._variables
+    def __repr__(self):
+        return f"""ERA5ZonalStatistics {self.iso3}-{self.admin_level} statistic={self.statistic}
+        filename = {self.filename}
+        variables = {self.variables}"""
 
-    def to_netcdf(self, path: str, fix_griddes: bool = True):
-        "Save NetCDF data"
-        if not fix_griddes:
-            self.dataset.to_netcdf(path)
-        else:
-            with tempfile.NamedTemporaryFile(suffix=".nc") as f:
-                self.dataset.to_netcdf(f.name)
-                griddes = CdoGriddes.from_file(f.name, base=self.population.griddes)
-                if griddes.gridtype == "generic":
-                    griddes.gridtype = "lonlat"
-                    with tempfile.NamedTemporaryFile(suffix=".txt") as grid_tmp:
-                        Path(grid_tmp.name).write_text(str(griddes))
-                        _cdo.setgrid(grid_tmp.name, input=f.name, output=path)
-            # verify griddes was fixed
-            assert CdoGriddes.from_file(path).gridtype == "lonlat"
-
-    @cache
-    def __getitem__(self, variable: str) -> xr.DataArray:
-        varname = VARIABLE_MAPPINGS.get(variable, variable)
-        return self.dataset[varname]
+    def zonal_daily(
+        self,
+        variable: str,
+        operation: str = "mean(coverage_weight=area_spherical_m2)",
+        weighted: bool = True,
+        min_date: datetime.date | None = None,
+        max_date: datetime.date | None = None,
+    ) -> pd.DataFrame:
+        metric = variable if variable in STDNAMES_TO_VAR else VAR_TO_STDNAMES[variable]
+        variable = (
+            variable if variable in VAR_TO_STDNAMES else STDNAMES_TO_VAR[variable]
+        )
+        const_cols = {"ISO3": self.iso3, "metric": f"era5.{metric}.{self.statistic}"}
+        return super().zonal_stats(
+            variable, operation, weighted, min_date, max_date, const_cols
+        )
