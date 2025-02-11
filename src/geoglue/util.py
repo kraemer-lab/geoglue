@@ -4,10 +4,28 @@ import logging
 from pathlib import Path
 import shutil
 
+import xarray as xr
 import requests
+import pandas as pd
+import geopandas as gpd
 
 
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
+
+
+def is_lonlat(data: str | Path | xr.Dataset | xr.DataArray) -> bool:
+    if isinstance(data, (str, Path)):
+        ds = xr.open_dataset(data)
+    else:
+        ds = data
+    return {"longitude", "latitude"} < set(ds.coords)
+
+
+def get_extents(gdf: gpd.GeoDataFrame) -> tuple[slice, slice]:
+    min_long, min_lat, max_long, max_lat = gdf.geometry.total_bounds
+    return slice(int(min_long), int(max_long) + 1), slice(
+        int(max_lat) + 1, int(min_lat)
+    )
 
 
 def unpack_file(path: Path, in_folder: Path | None = None):
@@ -32,3 +50,8 @@ def download_file(
     else:
         logging.error(f"Failed to fetch {url}, status={r.status_code}")
     return False
+
+
+# Plotting functions
+def geom_plot(df: pd.DataFrame, geometry: gpd.GeoDataFrame, col: str = "value"):
+    return gpd.GeoDataFrame(df.merge(geometry)).plot(col)
