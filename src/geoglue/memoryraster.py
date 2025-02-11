@@ -54,7 +54,7 @@ def get_numpy_dtype(t: str):
 class MemoryRaster:
     data: np.ndarray | np.ma.MaskedArray | xr.DataArray
     transform: affine.Affine
-    crs: str | None
+    crs: str | pyproj.crs.CRS | None
     nodata: int | float
     origin_path: Path | None = None
     dtype: str = "float64"
@@ -63,7 +63,7 @@ class MemoryRaster:
     @property
     def is_lonlat(self):
         return self.crs is not None and (
-            (isinstance(self.crs, pyproj.crs) and self.crs.to_epsg() == 4326)
+            (isinstance(self.crs, pyproj.crs.CRS) and self.crs.to_epsg() == 4326)
             or "4326" in str(self.crs)
         )
 
