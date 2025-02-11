@@ -132,6 +132,14 @@ def infer_statistic(ds: xr.Dataset) -> str | None:
     return None
 
 
+def is_lonlat(data: str | Path | xr.Dataset | xr.DataArray) -> bool:
+    if isinstance(data, (str, Path)):
+        ds = xr.open_dataset(data)
+    else:
+        ds = data
+    return {"longitude", "latitude"} < set(ds.coords)
+
+
 def resample(
     resampling: CdoResampling,
     infile: str | Path,
@@ -142,6 +150,10 @@ def resample(
     "Resamples input file to output file using CDO's resampling to a target raster grid"
     if isinstance(infile, str):
         infile = Path(infile)
+    if not is_lonlat(infile):
+        raise ValueError("resample only supports lonlat grid, input file does not conform")
+    if not target.is_lonlat:
+        raise ValueError("resample only supports lonlat grid, target MemoryRaster does not conform")
     if outfile is None:
         outfile = infile.parent / f"{infile.stem}_{resampling.name}.nc"
     if Path(outfile).exists() and skip_exists:

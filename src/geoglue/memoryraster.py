@@ -14,6 +14,7 @@ use as R's terra package.
 
 from __future__ import annotations
 
+import pyproj
 import xarray as xr
 import copy
 import dataclasses
@@ -60,6 +61,13 @@ class MemoryRaster:
     driver: str = "GTiff"
 
     @property
+    def is_lonlat(self):
+        return self.crs is not None and (
+            (isinstance(self.crs, pyproj.crs) and self.crs.to_epsg() == 4326)
+            or "4326" in str(self.crs)
+        )
+
+    @property
     def shape(self):
         return self.data.shape  # type: ignore
 
@@ -86,13 +94,14 @@ class MemoryRaster:
 
     @property
     def griddes(self) -> CdoGriddes:
+        if not self.is_lonlat:
+            raise ValueError(
+                "Only EPSG:4326 (WGS84) CRS latitude/longitude is supported.\n"
+                "Reproject CRS by passing crs='EPSG:4326' to MemoryRaster"
+            )
         gridtype = "lonlat"
-        assert "4326" in str(self.crs), (
-            "Only EPSG:4326 (WGS84) CRS latitude/longitude is supported.\n"
-            "Reproject CRS by passing crs='EPSG:4326' to MemoryRaster"
-        )
-        xname = xlongname = "longitude"
         xunits = "degrees_east"
+        xname = xlongname = "longitude"
         yname = ylongname = "latitude"
         yunits = "degrees_north"
         ysize, xsize = self.shape
