@@ -15,6 +15,7 @@ dependencies = [
     "matplotlib>=3.10.0",
     "netcdf4>=1.7.2",
     "pyarrow>=19.0.0",
+    "pycountry>=24.6.1",
     "pytz>=2024.2",
     "rasterio>=1.4.3",
     "requests>=2.32.3",
