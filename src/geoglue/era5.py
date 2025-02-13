@@ -22,7 +22,7 @@ import geopandas as gpd
 from tqdm import tqdm
 
 from .types import CdoResampling
-from .gadm import GADM
+from .country import Country
 from .memoryraster import MemoryRaster
 from .zonal_stats import DatasetZonalStatistics
 from .resample import resample
@@ -52,7 +52,7 @@ class ERA5Aggregated:
         admin_level = int(data.attrs.get("admin_level", 0))
         if admin_level == 0:
             admin_level = int(str(path.name).split("-")[1])
-        geom = GADM(iso3)[admin_level]
+        geom = Country(iso3).admin(admin_level)
         metric = data.metric.unique().tolist()[0]
         temporal_scope = "weekly" if "weekly" in metric else "daily"
         weighted = data.attrs.get("weighted", True)
@@ -97,7 +97,7 @@ class ERA5Aggregated:
     def weekly(self) -> ERA5Aggregated:
         metric = self.data.metric.unique().tolist()[0]
         df = (
-            self.data.groupby(GADM.list_admin_cols(self.admin_level) + ["isoweek"])
+            self.data.groupby(Country.list_admin_cols(self.admin_level) + ["isoweek"])
             .value.mean()
             .reset_index()
             .sort_values("isoweek")
@@ -135,7 +135,7 @@ class ERA5ZonalStatistics(DatasetZonalStatistics):
         self.filename = filename
         self.iso3 = iso3.upper()
         self.admin_level = level
-        gadm = GADM(iso3)
+        cc = Country(iso3)
         self.resampling = resampling
         # perform resampling to weights grid if weights present
         if weights:
@@ -146,9 +146,9 @@ class ERA5ZonalStatistics(DatasetZonalStatistics):
         self.statistic = infer_statistic(ds)
         super().__init__(
             ds,
-            gadm[level],
+            cc.admin(level)
             weights,
-            include_cols=gadm.list_admin_cols(level),
+            include_cols=cc.list_admin_cols(level),
             time_col="valid_time",
         )
 
