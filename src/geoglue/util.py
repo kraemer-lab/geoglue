@@ -13,6 +13,13 @@ import geopandas as gpd
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
 
 
+def zero_padded_intrange(start: int, end: int, inclusive=True) -> list[str]:
+    assert end > start, "End of range must be higher than start of range"
+    vals = range(start, end) if not inclusive else range(start, end + 1)
+    n = len(str(end)) if not inclusive else len(str(end + 1))
+    return [f"{i:0{n}d}" for i in vals]
+
+
 def is_lonlat(data: str | Path | xr.Dataset | xr.DataArray) -> bool:
     if isinstance(data, (str, Path)):
         ds = xr.open_dataset(data)
