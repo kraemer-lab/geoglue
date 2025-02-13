@@ -17,6 +17,7 @@ dependencies = [
     "pyarrow>=19.0.0",
     "rasterio>=1.4.3",
     "requests>=2.32.3",
+    "tomli>=2.2.1",
     "tqdm>=4.67.1",
     "xarray>=2025.1.1",
 ]
