@@ -157,6 +157,20 @@ wheels = [
 ]
 
 [[package]]
+name = "cdsapi"
+version = "0.7.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "datapi" },
+    { name = "requests" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/62/81b38105ef75486308179d510360c1aa251ce0b7d17fe88c0e1de05c6c94/cdsapi-0.7.5.tar.gz", hash = "sha256:55221c573b8cefe83cc0bfe01a3d31213c82bf9acce70455350dd24b8095c23a", size = 13188 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4e/c4/49f01f1382d449581d5d3db0fa49ccc23a1b4f91d615108b631c7cff40cd/cdsapi-0.7.5-py2.py3-none-any.whl", hash = "sha256:8586b837aea89ceeae379b388fbb0ace0a19b94b221f731c65632417007f69fb", size = 12201 },
+]
+
+[[package]]
 name = "certifi"
 version = "2024.12.14"
 source = { registry = "https://pypi.org/simple" }
@@ -400,6 +414,21 @@ wheels = [
 ]
 
 [[package]]
+name = "datapi"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "multiurl" },
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d5/af/d753f6872281ef933e97bc3e46874918cac335318ab687af05674fbb94a1/datapi-0.2.0.tar.gz", hash = "sha256:9346d1ce8bbada920da2d4fe0c932d8e7b36c8dd8bc7851862e87712cfa32fda", size = 43816 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b0/9d/2149dbe5baf64726242e25a906559b243a3e9ab38103996d2982430a881d/datapi-0.2.0-py3-none-any.whl", hash = "sha256:867c9ac1ae91965c4223236a2927a819bc0fc1e987490e10468db577936e1f7c", size = 26900 },
+]
+
+[[package]]
 name = "debugpy"
 version = "1.8.12"
 source = { registry = "https://pypi.org/simple" }
@@ -550,6 +579,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "cdo" },
+    { name = "cdsapi" },
     { name = "exactextract" },
     { name = "fastparquet" },
     { name = "geopandas" },
@@ -573,6 +603,7 @@ notebook = [
 [package.metadata]
 requires-dist = [
     { name = "cdo", specifier = ">=1.6.1" },
+    { name = "cdsapi", specifier = ">=0.7.5" },
     { name = "exactextract", specifier = ">=0.2.0" },
     { name = "fastparquet", specifier = ">=2024.11.0" },
     { name = "geopandas", specifier = ">=1.0.1" },
@@ -1089,6 +1120,18 @@ sdist = { url = "https://files.pythonhosted.org/packages/c6/1d/6b2b634e43bacc323
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c6/02/c66bdfdadbb021adb642ca4e8a5ed32ada0b4a3e4b39c5d076d19543452f/mistune-3.1.1-py3-none-any.whl", hash = "sha256:02106ac2aa4f66e769debbfa028509a275069dcffce0dfa578edd7b991ee700a", size = 53696 },
 ]
+
+[[package]]
+name = "multiurl"
+version = "0.3.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+    { name = "pytz" },
+    { name = "requests" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/33/db/aad981174d3bdaecc1d7e1f2d176641f022300ddf3a17b13c2775d041b7a/multiurl-0.3.3.tar.gz", hash = "sha256:f4d0b69dcf4a0ed740daa313dbcd4d5665420d305c50ca879285e96dc828093f", size = 18382 }
 
 [[package]]
 name = "nbclient"

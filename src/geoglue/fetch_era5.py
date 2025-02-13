@@ -8,6 +8,7 @@ to $HOME/.cdsapirc with the following contents:
     url: https://cds.climate.copernicus.eu/api
     key: <PERSONAL-ACCESS-TOKEN>
 """
+
 import logging
 from pathlib import Path
 
@@ -20,11 +21,21 @@ MONTHS = zero_padded_intrange(1, 12)
 DAYS = zero_padded_intrange(1, 31)
 TIMES = [s + ":00" for s in zero_padded_intrange(0, 23)]
 
-def fetch_era5_daily(iso3: str, year: int, variables: list[str], statistic: str, frequency: str = '6_hourly') -> Path:
+
+def fetch_era5_daily(
+    iso3: str,
+    year: int,
+    variables: list[str],
+    statistic: str,
+    frequency: str = "6_hourly",
+) -> Path:
+    cc = Country(iso3)
     if statistic not in SUPPORTED_STATISTICS:
-        raise ValueError(f"fetch_era5_daily: {statistic=} not in supported list {SUPPORTED_STATISTICS}")
+        raise ValueError(
+            f"fetch_era5_daily: {statistic=} not in supported list {SUPPORTED_STATISTICS}"
+        )
     dataset = "derived-era5-single-levels-daily-statistics"
-    offset = Country(iso3).hours_offset
+    offset = cc.timezone_offset
     request = {
         "product_type": "reanalysis",
         "variable": variables,
@@ -32,14 +43,16 @@ def fetch_era5_daily(iso3: str, year: int, variables: list[str], statistic: str,
         "month": MONTHS,
         "day": DAYS,
         "daily_statistic": statistic,
-        "time_zone": f"utc{offset:+03}:00",
+        "time_zone": f"utc{offset}",
         "frequency": frequency,
+        "area": cc.era5_extents,
     }
 
     client = cdsapi.Client()
     output = f"{iso3.upper()}-{year}-era5.{statistic}.nc"
     client.retrieve(dataset, request, output)
     return Path(output)
+
 
 def fetch_era5_hourly(iso3: str, year: int, variables: list[str]) -> Path:
     dataset = "reanalysis-era5-single-levels"
@@ -59,4 +72,3 @@ def fetch_era5_hourly(iso3: str, year: int, variables: list[str]) -> Path:
     output = "{iso3.upper()}-{year}-era5.hourly.zip"
     client.retrieve(dataset, request, output).download()
     return Path(output)
-
