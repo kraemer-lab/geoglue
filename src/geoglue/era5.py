@@ -28,52 +28,43 @@ from .zonal_stats import DatasetZonalStatistics
 from .resample import resample
 
 
-VAR_TO_STDNAMES: dict[str, str] = {"t2m": "2m_temperature"}
+VAR_TO_STDNAMES: dict[str, str] = {"t2m": "2m_temperature", "tp": "total_precipitation"}
 STDNAMES_TO_VAR: dict[str, str] = {v: k for k, v in VAR_TO_STDNAMES.items()}
 
 
-@dataclass
-class ERA5Aggregated:
-    data: pd.DataFrame
-    geometry: gpd.GeoDataFrame
-    admin_level: int
-    temporal_scope: Literal["weekly", "daily"]
-    weighted: bool = True
-
-    @staticmethod
-    def load(path: str | Path) -> ERA5Aggregated:
-        path = Path(path)
-        data = pd.read_parquet(path)
-
-        # Standard filename nomenclature is of the form ISO3-admin_level-metric.parquet
-        iso3 = data.attrs.get("iso3")
-        if iso3 is None:
-            iso3 = str(path.name).split("-")[0].upper()
-        admin_level = int(data.attrs.get("admin_level", 0))
-        if admin_level == 0:
-            admin_level = int(str(path.name).split("-")[1])
-        geom = Country(iso3).admin(admin_level)
-        metric = data.metric.unique().tolist()[0]
-        temporal_scope = "weekly" if "weekly" in metric else "daily"
-        weighted = data.attrs.get("weighted", True)
-        return ERA5Aggregated(data, geom, admin_level, temporal_scope, weighted)
-
-    def with_data(self, data: pd.DataFrame) -> ERA5Aggregated:
-        return ERA5Aggregated(
-            data, self.geometry, self.admin_level, self.temporal_scope, self.weighted
+class Dataset:
+    def __init__(self, data: pd.DataFrame):
+        self.data = data
+        self.metrics = data.metric.unique()
+        self.metric = self.metrics[0] if len(self.metrics) == 1 else None
+        if "daily_" in self.metrics[0]:
+            self.temporal_scope = "daily"
+            self.time = self.data.date.unique()
+            years = self.data.date.dt.year
+        elif "weekly_" in self.metrics[0]:
+            self.temporal_scope = "weekly"
+            self.time = self.data.isoweek.unique()
+            years = self.data.isoweek.str[:4].map(int)
+        else:
+            raise ValueError("No temporal scope detected in dataset")
+        min_year, max_year = int(years.min()), int(years.max())
+        fmt_year = str(min_year) if min_year == max_year else f"{min_year}_{max_year}"
+        self.weighted = "unweighted" not in self.metrics[0]
+        self.admin_level = int(
+            max(
+                c.removeprefix("GID_")
+                for c in self.data.columns
+                if c.startswith("GID_")
+            )
+        )
+        self.iso3 = self.data.ISO3.unique()[0]
+        self.geometry = Country(self.iso3).admin(self.admin_level)
+        self.filename = (
+            f"{self.iso3.upper()}-{self.admin_level}-{fmt_year}-{self.metric}.parquet"
         )
 
-    def save(self, path: str | Path | None = None) -> None:
-        iso3 = (self.geometry.GID_0.unique().tolist()[0],)
-        metric = self.data.metric.unique().tolist()[0]
-        self.data.attrs = {
-            "iso3": iso3,
-            "admin_level": self.admin_level,
-            "temporal_scope": self.temporal_scope,
-            "weighted": self.weighted,
-        }
-        path = path or Path(f"{iso3}-{self.admin_level}-{metric}.parquet")
-        self.data.to_parquet(path, index=False)
+    def __repr__(self):
+        return repr(self.data)
 
     def select(self, at: str):
         if self.temporal_scope == "weekly":
@@ -94,16 +85,30 @@ class ERA5Aggregated:
         ax.set_title(df.metric.unique()[0])
         plt.show()
 
-    def weekly(self) -> ERA5Aggregated:
-        metric = self.data.metric.unique().tolist()[0]
-        df = (
-            self.data.groupby(Country.list_admin_cols(self.admin_level) + ["isoweek"])
-            .value.mean()
-            .reset_index()
-            .sort_values("isoweek")
+    def weekly(self) -> Dataset:
+        assert self.metric is not None
+        self.data["isoweek"] = self.data.date.dt.strftime("%G-W%V")
+        metric = self.metric.replace("daily_", "weekly_")
+        agg = metric.split(".")[-1].removeprefix("weekly_")
+        weekgroups = self.data.groupby(
+            Country(self.iso3).list_admin_cols(self.admin_level) + ["isoweek"]
         )
-        df["metric"] = metric + ".weekly_mean"
-        return ERA5Aggregated(df, self.geometry, self.admin_level, "weekly")
+        match agg:
+            case "mean":
+                df = weekgroups.value.mean()
+            case "max":
+                df = weekgroups.value.max()
+            case "min":
+                df = weekgroups.value.min()
+            case "sum":
+                df = weekgroups.value.sum()
+        df = df.reset_index().sort_values("isoweek")  # type: ignore
+        df["metric"] = metric
+        df["ISO3"] = self.iso3
+        return Dataset(df)
+
+    def to_parquet(self, folder: Path = Path(".")):
+        return self.data.to_parquet(folder / self.filename, index=False)
 
 
 def infer_statistic(ds: xr.Dataset) -> str | None:
@@ -146,7 +151,7 @@ class ERA5ZonalStatistics(DatasetZonalStatistics):
         self.statistic = infer_statistic(ds)
         super().__init__(
             ds,
-            cc.admin(level)
+            cc.admin(level),
             weights,
             include_cols=cc.list_admin_cols(level),
             time_col="valid_time",
