@@ -165,15 +165,18 @@ class ERA5ZonalStatistics(DatasetZonalStatistics):
     def zonal_daily(
         self,
         variable: str,
-        operation: str = "mean(coverage_weight=area_spherical_m2)",
+        operation: str = "mean",
+        operation_params: str = "coverage_weight=area_spherical_m2",
         weighted: bool = True,
         min_date: datetime.date | None = None,
         max_date: datetime.date | None = None,
     ) -> pd.DataFrame:
+        operation = f"{operation}({operation_params})"
         metric = variable if variable in STDNAMES_TO_VAR else VAR_TO_STDNAMES[variable]
         variable = (
             variable if variable in VAR_TO_STDNAMES else STDNAMES_TO_VAR[variable]
         )
+        print(f"Zonal daily for {variable=} using {operation=}")
         const_cols = {"ISO3": self.iso3, "metric": f"era5.{metric}.{self.statistic}"}
         return super().zonal_stats(
             variable, operation, weighted, min_date, max_date, const_cols
