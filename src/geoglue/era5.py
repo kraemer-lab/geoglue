@@ -10,16 +10,12 @@ from __future__ import annotations
 
 import re
 import datetime
-from typing import Literal
 from pathlib import Path
-from dataclasses import dataclass
 
-import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
 import geopandas as gpd
-from tqdm import tqdm
 
 from .types import CdoResampling
 from .country import Country

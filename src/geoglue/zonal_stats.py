@@ -11,22 +11,21 @@ from __future__ import annotations
 import re
 import datetime
 import tempfile
-from typing import Literal
 from pathlib import Path
 from functools import cache
-from dataclasses import dataclass
 
+import cdo
 import numpy as np
 import pandas as pd
 import xarray as xr
 import geopandas as gpd
 from tqdm import tqdm
 
-from .util import get_extents, is_lonlat
-from .types import CdoGriddes, CdoResampling
+from .util import get_extents
+from .types import CdoGriddes
 from .memoryraster import MemoryRaster
-from .resample import resample
 
+_cdo = cdo.Cdo()
 
 class DatasetZonalStatistics:
     """Calculates zonal statistics for a daily temporal dataset"""
@@ -41,7 +40,7 @@ class DatasetZonalStatistics:
     ):
         self.dataset = dataset
         self.geom = geom
-        self.weighted = not (weights is None)
+        self.weighted = weights is not None
         if time_col is None:
             matching_cols = [
                 c
