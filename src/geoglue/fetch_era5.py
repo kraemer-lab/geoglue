@@ -9,7 +9,6 @@ to $HOME/.cdsapirc with the following contents:
     key: <PERSONAL-ACCESS-TOKEN>
 """
 
-import logging
 from pathlib import Path
 
 import cdsapi
