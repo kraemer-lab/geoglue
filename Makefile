@@ -1,5 +1,5 @@
 tests: lint install
-	uv run pytest --cov
+	uv run pytest --cov --cov-report=html
 
 install-uv:
 	curl -LsSf https://astral.sh/uv/0.6.0/install.sh | sh
