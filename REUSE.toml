@@ -1,0 +1,20 @@
+version = 1
+
+[[annotations]]
+path = "data/aegypti.tif"
+SPDX-FileComment = "Aedes aegypti occurrence"
+SPDX-License-Identifier = "CC0-1.0"
+Source-URL = "https://elifesciences.org/articles/08347"
+DOI = "https://doi.org/10.5061/dryad.47v3c"
+
+[[annotations]]
+path = "data/vnm_adm_gov_20201027/*"
+SPDX-FileComment = "Vietnam administrative boundaries"
+SPDX-License-Identifier = "CC-BY-3.0-IGO"
+Source-URL = "https://data.humdata.org/dataset/cod-ab-vnm"
+
+[[annotations]]
+path = "data/vnm_ppp_2020*"
+SPDX-FileComment = "Vietnam population from Worldpop, UN adjusted, 2020"
+SPDX-License-Identifier = "CC-BY-4.0"
+DOI = "https://doi.org/10.5258/SOTON/WP00685"
