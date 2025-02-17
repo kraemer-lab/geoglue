@@ -162,7 +162,7 @@ class ERA5ZonalStatistics(DatasetZonalStatistics):
         self,
         variable: str,
         operation: str = "mean",
-        operation_params: str = "coverage_weight=area_spherical_m2",
+        operation_params: str = "coverage_weight=area_spherical_km2",
         weighted: bool = True,
         min_date: datetime.date | None = None,
         max_date: datetime.date | None = None,

@@ -111,7 +111,7 @@ class DatasetZonalStatistics:
     def zonal_stats(
         self,
         variable: str,
-        operation: str = "mean(coverage_weight=area_spherical_m2)",
+        operation: str = "mean(coverage_weight=area_spherical_km2)",
         weighted: bool = True,
         min_date: datetime.date | None = None,
         max_date: datetime.date | None = None,
