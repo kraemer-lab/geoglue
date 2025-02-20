@@ -45,6 +45,9 @@ def download_file(
     url: str, path: Path, unpack: bool = True, unpack_in_folder: Path | None = None
 ) -> bool:
     """Download a file from a given URL to a given path."""
+    if path.is_dir():
+        # get last bit of URL and append to folder
+        path = path / url.split("/")[-1]
     if (r := requests.get(url)).status_code == 200:
         with open(path, "wb") as out:
             for bits in r.iter_content():
