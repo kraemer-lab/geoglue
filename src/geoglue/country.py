@@ -2,9 +2,12 @@
 
 import datetime
 from functools import cache
+from typing import Literal
+from pathlib import Path
 
 import pytz
 import pycountry
+import requests
 import geopandas as gpd
 
 import warnings
@@ -13,6 +16,11 @@ import geoglue
 from .util import download_file
 
 GADM_VERSION = "4.1"
+
+# Maximum administrative level supported by each geospatial backend
+SUPPORTED_BACKENDS = ["gadm", "geoboundaries"]
+Backend = Literal["gadm", "geoboundaries"]
+MAX_ADMIN: dict[Backend, int] = {"gadm": 3, "geoboundaries": 2}
 
 # Date used to localize the timezone obtained from pytz. Timezone
 # names (such as Europe/Berlin) do not have a fixed offset due to daylight
@@ -28,6 +36,14 @@ GADM_VERSION = "4.1"
 LOCALIZE_DATE = datetime.datetime(2022, 1, 1)
 
 
+def geoboundaries_shapefile_url(url: str, adm: int) -> str:
+    "Return shapefile URL for a particular admin level, geoboundaries backend"
+
+    if (r := requests.get(f"{url}/ADM{adm}/")).status_code != 200:
+        raise requests.ConnectionError(f"Error {r.status_code} when fetching {url=}")
+    return r.json()["staticDownloadLink"]
+
+
 def get_timezone_offset(tz: pytz.BaseTzInfo, localize_date: datetime.datetime) -> str:
     s = tz.localize(localize_date).strftime("%z")
     return s[:3] + ":" + s[3:]
@@ -39,19 +55,22 @@ class Country:
         iso3: str,
         gadm_version: str = GADM_VERSION,
         crs: str = "EPSG:4326",
+        backend: Backend = "gadm",
         localize_date: datetime.datetime = LOCALIZE_DATE,
+        data_path: Path | None = None,
         timezone: pytz.BaseTzInfo | None = None,
     ):
         self.iso3 = iso3.upper()
-        self.version = gadm_version
+        self.version = gadm_version if backend == "gadm" else None
+        self.backend: Backend = backend
         self.iso2 = pycountry.countries.lookup(self.iso3).alpha_2
         self.timezones = pytz.country_timezones(self.iso2)  # type: ignore
 
         if timezone is None:
             if len(self.timezones) > 1:
                 warnings.warn(
-                    "Multiple timezones for ISO3 country code {self.iso3} found {self.timezones}\n"
-                    "Selecting first timezone: {self.timezones[0]}"
+                    f"Multiple timezones for ISO3 country code {self.iso3} found {self.timezones}\n"
+                    f"Selecting first timezone: {self.timezones[0]}"
                 )
             self.timezone = pytz.timezone(self.timezones[0])  # type: ignore
         else:
@@ -60,30 +79,61 @@ class Country:
         self.timezone_offset = get_timezone_offset(self.timezone, localize_date)
         self._nodot_version = gadm_version.replace(".", "")
         self.crs = crs
-        self.url = f"https://geodata.ucdavis.edu/gadm/gadm{gadm_version}/shp/gadm{self._nodot_version}_{iso3}_shp.zip"
-        self.gadm_path = geoglue.data_path / f"gadm{self._nodot_version}" / iso3
-        if not self.gadm_path.exists():
-            self.gadm_path.mkdir(parents=True)
+        match backend:
+            case "gadm":
+                self.url = f"https://geodata.ucdavis.edu/gadm/gadm{gadm_version}/shp/gadm{self._nodot_version}_{iso3}_shp.zip"
+                self.data_path = (
+                    (data_path or geoglue.data_path)
+                    / f"gadm{self._nodot_version}"
+                    / iso3
+                )
+            case "geoboundaries":
+                self.url = f"https://www.geoboundaries.org/api/current/gbOpen/{iso3}/"
+                self.data_path = (
+                    (data_path or geoglue.data_path) / "geoboundaries" / iso3
+                )
+        if backend not in SUPPORTED_BACKENDS:
+            raise ValueError(f"Unsupported geographic data {backend=}")
+
+        if not self.data_path.exists():
+            self.data_path.mkdir(parents=True)
 
     def fetch_shapefiles(self) -> bool:
-        return download_file(self.url, self.gadm_path / self.url.split("/")[-1])
+        match self.backend:
+            case "gadm":
+                return download_file(self.url, self.data_path / self.url.split("/")[-1])
+            case "geoboundaries":
+                files = [
+                    download_file(
+                        geoboundaries_shapefile_url(self.url, adm=i), self.data_path
+                    )
+                    for i in range(3)
+                ]
+                return all(files)
 
     @property
     def era5_extents(self) -> list[int]:
         minx, miny, maxx, maxy = self.admin(0).total_bounds
         return [int(maxy) + 1, int(minx), int(miny), int(maxx) + 1]
 
-    @staticmethod
-    def list_admin_cols(i) -> list[str]:
-        cols = []
-        for k in range(1, i + 1):
-            cols.extend([it + "_" + str(k) for it in ["GID", "NAME"]])
-        return cols
+    def admin_cols(self, adm: int) -> list[str]:
+        match self.backend:
+            case "gadm":
+                return [f"{c}_{i}" for c in ["GID", "NAME"] for i in range(1, adm + 1)]
+            case "geoboundaries":
+                return ["shapeID", "shapeName", "shapeISO"]
 
     @cache
-    def admin(self, admin_level: int):
-        if admin_level > 3:
-            raise IndexError("Only admin level upto 3 supported in GADM")
-        return gpd.read_file(
-            self.gadm_path / f"gadm{self._nodot_version}_{self.iso3}_{admin_level}.shp"
-        ).to_crs(self.crs)
+    def admin(self, adm: int):
+        if adm > MAX_ADMIN[self.backend]:
+            raise ValueError(f"Unsupported {adm=} for backend={self.backend!r}")
+
+        match self.backend:
+            case "gadm":
+                return gpd.read_file(
+                    self.data_path / f"gadm{self._nodot_version}_{self.iso3}_{adm}.shp"
+                ).to_crs(self.crs)
+            case "geoboundaries":
+                return gpd.read_file(
+                    self.data_path / f"geoBoundaries-{self.iso3}-ADM{adm}.shp"
+                )
