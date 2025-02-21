@@ -14,7 +14,19 @@ SPDX-License-Identifier = "CC-BY-3.0-IGO"
 Source-URL = "https://data.humdata.org/dataset/cod-ab-vnm"
 
 [[annotations]]
-path = "data/vnm_ppp_2020*"
+path = "data/VNM/worldpop/vnm_ppp_2020_UNadj_constrained.tif"
 SPDX-FileComment = "Vietnam population from Worldpop, UN adjusted, 2020"
 SPDX-License-Identifier = "CC-BY-4.0"
 DOI = "https://doi.org/10.5258/SOTON/WP00685"
+
+[[annotations]]
+path = "data/VNM/worldpop/vnm_ppp_*_1km_Aggregated_UNadj.tif"
+SPDX-FileComment = "Vietnam population from Worldpop, UN adjusted, 1km"
+SPDX-License-Identifier = "CC-BY-4.0"
+DOI = "https://doi.org/10.5258/SOTON/WP00671"
+
+[[annotations]]
+path = "data/VNM/geoboundaries/*"
+SPDX-FileComment = "www.geoboundaries.org data for Vietnam"
+SPDX-License-Identifier = "CC-BY-4.0"
+DOI = "https://doi.org/10.1371/journal.pone.0231866"
