@@ -20,7 +20,8 @@ def adm2_polygons():
 def population_1km(adm2_polygons):
     return (
         MemoryRaster.read(
-            DATA_PATH / "vnm_ppp_2020_1km_Aggregated_UNadj.tif", crs=adm2_polygons.crs.srs
+            DATA_PATH / "VNM" / "worldpop" / "vnm_ppp_2020_1km_Aggregated_UNadj.tif",
+            crs=adm2_polygons.crs.srs,
         )
         .mask(adm2_polygons)
         .astype(np.float32)
