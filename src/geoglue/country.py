@@ -13,6 +13,8 @@ import geopandas as gpd
 import warnings
 
 import geoglue
+
+from .memoryraster import MemoryRaster
 from .util import download_file
 
 GADM_VERSION = "4.1"
@@ -77,26 +79,22 @@ class Country:
             self.timezone = timezone
 
         self.timezone_offset = get_timezone_offset(self.timezone, localize_date)
+        self.data_path = data_path or geoglue.data_path
         self._nodot_version = gadm_version.replace(".", "")
         self.crs = crs
         match backend:
             case "gadm":
                 self.url = f"https://geodata.ucdavis.edu/gadm/gadm{gadm_version}/shp/gadm{self._nodot_version}_{iso3}_shp.zip"
-                self.data_path = (
-                    (data_path or geoglue.data_path)
-                    / f"gadm{self._nodot_version}"
-                    / iso3
-                )
+                self.path_geodata = self.data_path / iso3 / f"gadm{self._nodot_version}"
             case "geoboundaries":
                 self.url = f"https://www.geoboundaries.org/api/current/gbOpen/{iso3}/"
-                self.data_path = (
-                    (data_path or geoglue.data_path) / "geoboundaries" / iso3
-                )
+                self.path_geodata = self.data_path / iso3 / "geoboundaries"
+        self.path_population = self.data_path / iso3 / "worldpop"
         if backend not in SUPPORTED_BACKENDS:
             raise ValueError(f"Unsupported geographic data {backend=}")
 
-        if not self.data_path.exists():
-            self.data_path.mkdir(parents=True)
+        self.path_geodata.mkdir(parents=True, exist_ok=True)
+        self.path_population.mkdir(parents=True, exist_ok=True)
 
     def fetch_shapefiles(self) -> bool:
         match self.backend:
@@ -116,6 +114,18 @@ class Country:
         minx, miny, maxx, maxy = self.admin(0).total_bounds
         return [int(maxy) + 1, int(minx), int(miny), int(maxx) + 1]
 
+    def population_raster(self, year: int) -> MemoryRaster:
+        if year < 2000 or year > 2020:
+            raise ValueError(
+                "Current population source 'worldpop' only has data from 2000-2020"
+            )
+        url = f"https://data.worldpop.org/GIS/Population/Global_2000_2020_1km_UNadj/{year}/VNM/vnm_ppp_{year}_1km_Aggregated_UNadj.tif"
+        output_path = self.path_population / url.split("/")[-1]
+        if output_path.exists() or download_file(url, output_path):
+            return MemoryRaster.read(output_path)
+        else:
+            raise requests.ConnectionError(f"Failed to download {url=}")
+
     def admin_cols(self, adm: int) -> list[str]:
         match self.backend:
             case "gadm":
@@ -131,9 +141,9 @@ class Country:
         match self.backend:
             case "gadm":
                 return gpd.read_file(
-                    self.data_path / f"gadm{self._nodot_version}_{self.iso3}_{adm}.shp"
+                    self.path_geodata / f"gadm{self._nodot_version}_{self.iso3}_{adm}.shp"
                 ).to_crs(self.crs)
             case "geoboundaries":
                 return gpd.read_file(
-                    self.data_path / f"geoBoundaries-{self.iso3}-ADM{adm}.shp"
+                    self.path_geodata / f"geoBoundaries-{self.iso3}-ADM{adm}.shp"
                 )
