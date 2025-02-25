@@ -87,7 +87,7 @@ class Dataset:
         metric = self.metric.replace("daily_", "weekly_")
         agg = metric.split(".")[-1].removeprefix("weekly_")
         weekgroups = self.data.groupby(
-            Country(self.iso3).list_admin_cols(self.admin_level) + ["isoweek"]
+            Country(self.iso3).admin_cols(self.admin_level) + ["isoweek"]
         )
         match agg:
             case "mean":
@@ -149,7 +149,7 @@ class ERA5ZonalStatistics(DatasetZonalStatistics):
             ds,
             cc.admin(level),
             weights,
-            include_cols=cc.list_admin_cols(level),
+            include_cols=cc.admin_cols(level),
             time_col="valid_time",
         )
 
