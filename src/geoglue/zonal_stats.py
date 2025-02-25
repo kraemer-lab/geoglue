@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import datetime
 import tempfile
+import warnings
 from pathlib import Path
 from functools import cache
 
@@ -26,6 +27,7 @@ from .types import CdoGriddes
 from .memoryraster import MemoryRaster
 
 _cdo = cdo.Cdo()
+
 
 class DatasetZonalStatistics:
     """Calculates zonal statistics for a daily temporal dataset"""
@@ -119,6 +121,13 @@ class DatasetZonalStatistics:
     ) -> pd.DataFrame:
         da = self[variable]
         # shape after dropping time axis should be identical
+        if operation.startswith("area_weighted_sum") and not weighted:
+            warnings.warn(
+                "Area weighted sum passed without weights is equivalent\n"
+                "to using mean with the coverage weight set to area, using:\n"
+                'operation="mean(coverage_weight=area_spherical_km2)"'
+            )
+            operation = "mean(coverage_weight=area_spherical_km2)"
         if weighted:
             if self.weights is None:
                 raise ValueError(
@@ -127,7 +136,8 @@ class DatasetZonalStatistics:
             assert (
                 da.shape[1:] == self.weights.shape
             ), f"Variable shape {da.shape[1:]} and weights shape {self.weights.shape} must be identical"
-            operation = "weighted_" + operation
+            if "weighted" not in operation:
+                operation = "weighted_" + operation
         min_date = min_date or da[self.time_col].min().dt.date.item(0)
         max_date = max_date or da[self.time_col].max().dt.date.item(0)
         assert max_date >= min_date, "End date must be later than start date"  # type: ignore
@@ -139,12 +149,25 @@ class DatasetZonalStatistics:
         for date in tqdm(pd.date_range(min_date, max_date, inclusive="both")):
             rast = MemoryRaster.from_xarray(da.sel({self.time_col: date}))
             if weighted:
-                df = rast.zonal_stats(
-                    self.geom,
-                    operation,
-                    weights=self.weights,
-                    include_cols=self.include_cols,
-                ).rename(columns={exactextract_output_column: "value"})
+                if not operation.startswith("area_weighted_sum"):
+                    df = rast.zonal_stats(
+                        self.geom,
+                        operation,
+                        weights=self.weights,
+                        include_cols=self.include_cols,
+                    ).rename(columns={exactextract_output_column: "value"})
+                else:
+                    df = rast.zonal_stats(
+                        self.geom,
+                        [
+                            "weighted_sum(coverage_weight=area_spherical_km2)",
+                            "count(coverage_weight=area_spherical_km2)",
+                        ],
+                        weights=self.weights,
+                        include_cols=self.include_cols,
+                    )
+                    df["value"] = df["weighted_sum"] / df["count"]
+                    df = df.drop(["weighted_sum", "count"], axis=1)
             else:
                 df = rast.zonal_stats(
                     self.geom,
