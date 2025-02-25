@@ -18,6 +18,7 @@ import pyproj
 import xarray as xr
 import copy
 import dataclasses
+from typing import Callable
 from pathlib import Path
 from contextlib import contextmanager
 
@@ -326,7 +327,7 @@ class MemoryRaster:
     def zonal_stats(
         self,
         geometry: gpd.GeoDataFrame,
-        ops: str,
+        ops: str | list[str] | Callable,
         weights: MemoryRaster | None = None,
         **kwargs,
     ) -> pd.DataFrame | gpd.GeoDataFrame:
