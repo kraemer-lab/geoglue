@@ -161,6 +161,19 @@ class MemoryRaster:
     ) -> MemoryRaster:
         "Creates MemoryRaster from xarray, assumes EPSG:4326"
         da = da.sortby(da.latitude, ascending=False)
+        attrs = da.attrs
+
+        if nodata is None:
+            # When reading netCDF files, nodata value is stored in certain
+            # attributes This is the list of attributes to search, in order, to
+            # obtain nodata value
+            nodata = (
+                attrs.get("GRIB_missingValue")
+                or attrs.get("nodata")
+                or attrs.get("_FillValue")
+                or attrs.get("missing_value")
+            )
+
         transform = from_origin(
             da[c_longitude].min(),
             da[c_latitude].max(),
@@ -229,12 +242,9 @@ class MemoryRaster:
         with MemoryFile() as memfile:
             if zfill and np.ma.isMaskedArray(self.data):
                 data = self.data.filled(0)  # type: ignore
-                profile = copy.deepcopy(self.profile)
-                del profile["nodata"]
             else:
                 data = self.data
-                profile = self.profile
-            with memfile.open(**profile) as dataset:
+            with memfile.open(**self.profile) as dataset:
                 dataset.write(np.expand_dims(data, axis=0))
 
             with memfile.open() as dataset:
