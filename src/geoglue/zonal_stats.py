@@ -142,8 +142,11 @@ class DatasetZonalStatistics:
         max_date = max_date or da[self.time_col].max().dt.date.item(0)
         assert max_date >= min_date, "End date must be later than start date"  # type: ignore
 
-        exactextract_output_column = re.match(r"(\w+)(?=\()", operation).group(1)  # type: ignore
-        # Empty dataframe with output columns
+        exactextract_output_column = (
+            re.match(r"(\w+)(?=\()", operation).group(1)  # type: ignore
+            if "(" in operation
+            else operation
+        )
         out = pd.DataFrame(data=[], columns=self.include_cols + ["value", "date"])
 
         for date in tqdm(pd.date_range(min_date, max_date, inclusive="both")):
