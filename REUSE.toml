@@ -30,3 +30,9 @@ path = "data/VNM/geoboundaries/*"
 SPDX-FileComment = "www.geoboundaries.org data for Vietnam"
 SPDX-License-Identifier = "CC-BY-4.0"
 DOI = "https://doi.org/10.1371/journal.pone.0231866"
+
+[[annotations]]
+path = "data/VNM/era5/*"
+SPDX-FileComment = "ERA5 reanalysis data"
+License = "https://object-store.os-api.cci2.ecmwf.int/cci2-prod-catalogue/licences/licence-to-use-copernicus-products/licence-to-use-copernicus-products_b4b9451f54cffa16ecef5c912c9cebd6979925a956e3fa677976e0cf198c2c18.pdf"
+SPDX-FileAttributionText = "Generated using Copernicus Climate Change Service information [2025]"
