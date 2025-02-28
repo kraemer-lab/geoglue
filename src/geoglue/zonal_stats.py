@@ -170,7 +170,6 @@ class DatasetZonalStatistics:
                         include_cols=self.include_cols,
                     )
                     df["value"] = df["weighted_sum"] / df["count"]
-                    df = df.drop(["weighted_sum", "count"], axis=1)
             else:
                 df = rast.zonal_stats(
                     self.geom,
