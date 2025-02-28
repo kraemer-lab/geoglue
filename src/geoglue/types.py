@@ -7,6 +7,8 @@ from enum import Enum
 from pathlib import Path
 from dataclasses import dataclass, asdict
 
+import numpy as np
+
 from cdo import Cdo
 
 _cdo = Cdo()
@@ -43,7 +45,9 @@ class CdoGriddes:
         return "\n".join(out)
 
     @staticmethod
-    def from_file(file: str | Path, base: CdoGriddes | None = None, **kwargs) -> CdoGriddes:
+    def from_file(
+        file: str | Path, base: CdoGriddes | None = None, **kwargs
+    ) -> CdoGriddes:
         out = {}
         for line in _cdo.griddes(input=str(file)):
             if line.startswith("#"):
@@ -67,6 +71,19 @@ class CdoGriddes:
         if kwargs:
             new_out.update(kwargs)
         return CdoGriddes(**out)
+
+    def approx_equal(self, other: CdoGriddes, rtol=1e-05, atol=1e-08) -> bool:
+        "Approximate equality testing, with absolute (atol) and relative (rtol) tolerance"
+        float_fields = ["xfirst", "yfirst", "xinc", "yinc"]
+        this_floats = np.array([getattr(self, f) for f in float_fields])
+        other_floats = np.array([getattr(other, f) for f in float_fields])
+
+        this_dict = {k: v for k, v in asdict(self).items() if k not in float_fields}
+        other_dict = {k: v for k, v in asdict(self).items() if k not in float_fields}
+
+        return this_dict == other_dict and np.allclose(
+            this_floats, other_floats, rtol=rtol, atol=atol
+        )
 
     def write(self, file: str | Path):
         Path(file).write_text(str(self))
