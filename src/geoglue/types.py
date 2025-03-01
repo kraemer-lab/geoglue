@@ -55,6 +55,10 @@ class CdoGriddes:
             key, value = line.split("=")
             key = key.strip()
             value = value.strip()
+            # do not record default scanningMode = 64
+            # see https://sources.debian.org/src/cdo/2.5.0-1/src/griddes.h/#L37
+            if key == "scanningMode" and int(value) == 64:
+                continue
             if key.endswith("size"):
                 out[key] = int(value)
                 continue
