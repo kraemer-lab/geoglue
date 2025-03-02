@@ -114,12 +114,13 @@ class DatasetZonalStatistics:
         self,
         variable: str,
         operation: str = "mean(coverage_weight=area_spherical_km2)",
-        weighted: bool = True,
+        weighted: bool | None = None,
         min_date: datetime.date | None = None,
         max_date: datetime.date | None = None,
         const_cols: dict[str, str] | None = None,
     ) -> pd.DataFrame:
         da = self[variable]
+        weighted = weighted or self.weighted
         # shape after dropping time axis should be identical
         if operation.startswith("area_weighted_sum") and not weighted:
             warnings.warn(
