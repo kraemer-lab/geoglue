@@ -79,7 +79,6 @@ def test_zonal_stats(ds, ops, int_value_max, request):
     df = ds.zonal_stats("tp", ops, min_date=d, max_date=d)
     assert len(df) == ADMIN2_N
     assert (df.value >= 0).all()  # non-negative values
-
     assert int(df.value.max()) == int_value_max
     if ops == "area_weighted_sum":
         assert "weighted_sum" in df.columns and "count" in df.columns

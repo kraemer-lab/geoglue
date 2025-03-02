@@ -131,7 +131,7 @@ class Country:
             case "gadm":
                 return [f"{c}_{i}" for c in ["GID", "NAME"] for i in range(1, adm + 1)]
             case "geoboundaries":
-                return ["shapeID", "shapeName", "shapeISO"]
+                return ["shapeID", "shapeName"]
 
     @cache
     def admin(self, adm: int):
@@ -146,4 +146,4 @@ class Country:
             case "geoboundaries":
                 return gpd.read_file(
                     self.path_geodata / f"geoBoundaries-{self.iso3}-ADM{adm}.shp"
-                )
+                ).drop("shapeISO", axis=1)
