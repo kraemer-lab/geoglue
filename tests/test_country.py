@@ -36,7 +36,7 @@ def test_url_gadm(country_gadm):
 
 def test_admin_cols(country, country_gadm):
     assert country_gadm.admin_cols(2) == ["GID_1", "GID_2", "NAME_1", "NAME_2"]
-    assert country.admin_cols(2) == ["shapeID", "shapeName", "shapeISO"]
+    assert country.admin_cols(2) == ["shapeID", "shapeName"]
 
 
 def test_invalid_admin_raises_error(country, country_gadm):
