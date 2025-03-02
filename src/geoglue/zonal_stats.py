@@ -133,9 +133,10 @@ class DatasetZonalStatistics:
                 raise ValueError(
                     "Weighted zonal statistics requested but no weights supplied"
                 )
-            assert (
-                da.shape[1:] == self.weights.shape
-            ), f"Variable shape {da.shape[1:]} and weights shape {self.weights.shape} must be identical"
+            if da.shape[1:] != self.weights.shape:
+                raise ValueError(
+                    f"Variable shape {da.shape[1:]} and weights shape {self.weights.shape} must be identical"
+                )
             if "weighted" not in operation:
                 operation = "weighted_" + operation
         min_date = min_date or da[self.time_col].min().dt.date.item(0)
