@@ -99,11 +99,13 @@ class Country:
     def fetch_shapefiles(self) -> bool:
         match self.backend:
             case "gadm":
-                return download_file(self.url, self.data_path / self.url.split("/")[-1])
+                return download_file(
+                    self.url, self.path_geodata / self.url.split("/")[-1]
+                )
             case "geoboundaries":
                 files = [
                     download_file(
-                        geoboundaries_shapefile_url(self.url, adm=i), self.data_path
+                        geoboundaries_shapefile_url(self.url, adm=i), self.path_geodata
                     )
                     for i in range(3)
                 ]
