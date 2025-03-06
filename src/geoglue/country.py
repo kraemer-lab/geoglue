@@ -19,6 +19,10 @@ from .util import download_file
 
 GADM_VERSION = "4.1"
 
+SHP_EXT = ["shp", "dbf", "prj", "shx"]  # shapefile extensions
+GADM_EXT = SHP_EXT + ["cpg"]
+GEOBOUNDARIES_EXT = SHP_EXT
+
 # Maximum administrative level supported by each geospatial backend
 SUPPORTED_BACKENDS = ["gadm", "geoboundaries"]
 Backend = Literal["gadm", "geoboundaries"]
@@ -61,6 +65,7 @@ class Country:
         localize_date: datetime.datetime = LOCALIZE_DATE,
         data_path: Path | None = None,
         timezone: pytz.BaseTzInfo | None = None,
+        fetch_data: bool = True,
     ):
         self.iso3 = iso3.upper()
         self.version = gadm_version if backend == "gadm" else None
@@ -86,15 +91,35 @@ class Country:
             case "gadm":
                 self.url = f"https://geodata.ucdavis.edu/gadm/gadm{gadm_version}/shp/gadm{self._nodot_version}_{iso3}_shp.zip"
                 self.path_geodata = self.data_path / iso3 / f"gadm{self._nodot_version}"
+                self.geodata_manifest = [
+                    self.path_geodata
+                    / f"gadm{self._nodot_version}_{self.iso3}_{i}.{ext}"
+                    for i in [0, 1, 2]
+                    for ext in GADM_EXT
+                ]
+
             case "geoboundaries":
                 self.url = f"https://www.geoboundaries.org/api/current/gbOpen/{iso3}/"
                 self.path_geodata = self.data_path / iso3 / "geoboundaries"
+                self.geodata_manifest = [
+                    self.path_geodata / f"geoBoundaries-{self.iso3}-ADM{i}.{ext}"
+                    for i in [0, 1, 2]
+                    for ext in GEOBOUNDARIES_EXT
+                ]
         self.path_population = self.data_path / iso3 / "worldpop"
         if backend not in SUPPORTED_BACKENDS:
             raise ValueError(f"Unsupported geographic data {backend=}")
 
         self.path_geodata.mkdir(parents=True, exist_ok=True)
         self.path_population.mkdir(parents=True, exist_ok=True)
+
+        if fetch_data and not self.geodata_manifest_ok:
+            self.fetch_shapefiles()
+
+    @property
+    def geodata_manifest_ok(self) -> bool:
+        "Returns True if all expected files in geodata manifest are present"
+        return all(f.exists() for f in self.geodata_manifest)
 
     def fetch_shapefiles(self) -> bool:
         match self.backend:
@@ -143,9 +168,14 @@ class Country:
         match self.backend:
             case "gadm":
                 return gpd.read_file(
-                    self.path_geodata / f"gadm{self._nodot_version}_{self.iso3}_{adm}.shp"
+                    self.path_geodata
+                    / f"gadm{self._nodot_version}_{self.iso3}_{adm}.shp"
                 ).to_crs(self.crs)
             case "geoboundaries":
-                return gpd.read_file(
-                    self.path_geodata / f"geoBoundaries-{self.iso3}-ADM{adm}.shp"
-                ).drop("shapeISO", axis=1)
+                return (
+                    gpd.read_file(
+                        self.path_geodata / f"geoBoundaries-{self.iso3}-ADM{adm}.shp"
+                    )
+                    .to_crs(self.crs)
+                    .drop("shapeISO", axis=1)
+                )
