@@ -1,6 +1,7 @@
 from pathlib import Path
 import pytest
 
+import pytz
 
 from geoglue.country import Country
 
@@ -16,7 +17,23 @@ def country():
 # Will check everything other than shapefile download
 @pytest.fixture(scope="module")
 def country_gadm():
-    return Country("VNM")
+    return Country("VNM", fetch_data=False)
+
+
+def test_timezone_assignment():
+    cc = Country("VNM", timezone=pytz.timezone("Asia/Ho_Chi_Minh"))
+    assert cc.timezone == pytz.timezone("Asia/Ho_Chi_Minh")
+
+
+def test_invalid_backend():
+    with pytest.raises(ValueError, match="Unsupported geographic data backend"):
+        Country("VNM", backend="osm")  # type: ignore
+
+
+def test_timezone_warnings():
+    with pytest.warns(match="Multiple timezones for ISO3 country code"):
+        cc = Country("USA", fetch_data=False)
+        assert cc.timezone == pytz.timezone("America/New_York")
 
 
 def test_timezone_offset(country, country_gadm):
@@ -49,6 +66,14 @@ def test_invalid_admin_raises_error(country, country_gadm):
 @pytest.mark.parametrize("year,population", [(2000, 79910432), (2020, 97338600)])
 def test_population(country, year, population):
     assert int(country.population_raster(year).sum()) == population
+
+
+def test_population_invalid_year(country):
+    err = "Current population source 'worldpop' only has data from 2000-2020"
+    with pytest.raises(ValueError, match=err):
+        country.population_raster(1999)
+    with pytest.raises(ValueError, match=err):
+        country.population_raster(2040)
 
 
 # Requires shapefiles -- only test with geoboundaries
