@@ -11,13 +11,13 @@ from __future__ import annotations
 import re
 import datetime
 from pathlib import Path
+from typing import Literal
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
 import geopandas as gpd
 
-from .types import CdoResampling
 from .country import Country
 from .memoryraster import MemoryRaster
 from .zonal_stats import DatasetZonalStatistics
@@ -129,7 +129,7 @@ class ERA5ZonalStatistics(DatasetZonalStatistics):
         filename: str,
         admin: str,
         weights: MemoryRaster | None = None,
-        resampling: CdoResampling = CdoResampling.remapbil,
+        resampling: Literal["remapbil", "remapdis"] = "remapbil",
     ):
         iso3, level = admin.split("-")
         level = int(level)

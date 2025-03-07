@@ -1,16 +1,16 @@
 import tempfile
 from pathlib import Path
+from typing import Literal
 
 import cdo
 
 from .memoryraster import MemoryRaster
-from .types import CdoResampling
 from .util import is_lonlat
 
 _cdo = cdo.Cdo()
 
 def resample(
-    resampling: CdoResampling,
+    resampling: Literal["remapbil", "remapdis"],
     infile: str | Path,
     target: MemoryRaster,
     outfile: str | Path | None = None,
@@ -24,15 +24,15 @@ def resample(
     if not target.is_lonlat:
         raise ValueError("resample only supports lonlat grid, target MemoryRaster does not conform")
     if outfile is None:
-        outfile = infile.parent / f"{infile.stem}_{resampling.name}.nc"
+        outfile = infile.parent / f"{infile.stem}_{resampling}.nc"
     if Path(outfile).exists() and skip_exists:
         return Path(outfile)
     with tempfile.NamedTemporaryFile(suffix=".txt") as griddes:
         Path(griddes.name).write_text(str(target.griddes))
 
         match resampling:
-            case CdoResampling.remapbil:
+            case "remapbil":
                 _cdo.remapbil(griddes.name, input=str(infile), output=str(outfile))
-            case CdoResampling.remapdis:
+            case "remapdis":
                 _cdo.remapdis(griddes.name, input=str(infile), output=str(outfile))
         return Path(outfile)

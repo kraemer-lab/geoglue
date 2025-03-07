@@ -6,7 +6,6 @@ import xarray as xr
 from geoglue.zonal_stats import DatasetZonalStatistics
 from geoglue.country import Country
 from geoglue.resample import resample
-from geoglue.types import CdoResampling
 
 DATA_PATH = Path("data")
 PRECIP_DATA = DATA_PATH / "VNM" / "era5" / "VNM-2020-era5.daily_sum.nc"
@@ -47,7 +46,7 @@ def dataset_unweighted(vnm_geoboundaries_admin2):
 def dataset_resampled(vnm_geoboundaries_admin2, vnm_pop):
     outfile = PRECIP_DATA.parent / (PRECIP_DATA.stem + "_remapdis.nc")
     if not outfile.exists():
-        resample(CdoResampling.remapdis, PRECIP_DATA, vnm_pop, outfile)
+        resample("remapdis", PRECIP_DATA, vnm_pop, outfile)
     ds = xr.open_dataset(outfile)
     return DatasetZonalStatistics(ds, vnm_geoboundaries_admin2, vnm_pop)
 
