@@ -16,13 +16,8 @@ def fmt(session):
 
 
 @nox.session
-def base(session):
+def tests(session):
     session.env.update({"UV_PROJECT_ENVIRONMENT": session.virtualenv.location})
     session.run("uv", "sync", "--all-extras", "--dev")
     session.run("bash", "./scripts/install_cdo.sh", external=True)
-
-
-@nox.session
-def tests(session):
-    base(session)
     session.run("uv", "run", "pytest", "--cov", "--cov-report=html")
