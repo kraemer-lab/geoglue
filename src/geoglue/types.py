@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-from enum import Enum
 from pathlib import Path
 from dataclasses import dataclass, asdict
 
@@ -13,8 +12,6 @@ from cdo import Cdo
 
 _cdo = Cdo()
 
-
-CdoResampling = Enum("CdoResampling", ["remapbil", "remapdis"])
 
 @dataclass
 class CdoGriddes:
