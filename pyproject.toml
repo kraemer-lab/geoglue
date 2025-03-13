@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Abhishek Dasgupta", email = "abhishek.dasgupta@dtc.ox.ac.uk" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "cdo>=1.6.1",
     "cdsapi>=0.7.5",
