@@ -15,7 +15,7 @@ def fmt(session):
     session.run("ruff", "format", "--check")
 
 
-@nox.session
+@nox.session(python="3.10")
 def tests(session):
     session.env.update({"UV_PROJECT_ENVIRONMENT": session.virtualenv.location})
     session.run("uv", "sync", "--all-extras", "--dev")
