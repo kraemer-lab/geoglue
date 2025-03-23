@@ -26,8 +26,6 @@ from .util import get_extents
 from .types import CdoGriddes
 from .memoryraster import MemoryRaster
 
-_cdo = cdo.Cdo()
-
 
 class DatasetZonalStatistics:
     """Calculates zonal statistics for a daily temporal dataset"""
@@ -92,6 +90,7 @@ class DatasetZonalStatistics:
 
     def to_netcdf(self, path: str, fix_griddes: bool = True):
         "Save NetCDF data"
+        _cdo = cdo.Cdo()
         if not fix_griddes:
             self.dataset.to_netcdf(path)
         else:
