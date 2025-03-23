@@ -10,8 +10,6 @@ import numpy as np
 
 from cdo import Cdo
 
-_cdo = Cdo()
-
 
 @dataclass
 class CdoGriddes:
@@ -46,6 +44,7 @@ class CdoGriddes:
         file: str | Path, base: CdoGriddes | None = None, **kwargs
     ) -> CdoGriddes:
         out = {}
+        _cdo = Cdo()
         for line in _cdo.griddes(input=str(file)):
             if line.startswith("#"):
                 continue
