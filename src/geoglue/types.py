@@ -2,13 +2,47 @@
 
 from __future__ import annotations
 
+import math
 import copy
 from pathlib import Path
+from typing import NamedTuple
 from dataclasses import dataclass, asdict
 
 import numpy as np
 
 from cdo import Cdo
+
+
+class Bounds(NamedTuple):
+    "Geographic bounds"
+
+    north: int | float
+    west: int | float
+    south: int | float
+    east: int | float
+
+    def __lt__(self, other):
+        return (
+            self.north <= other.north
+            and self.west >= other.west
+            and self.south >= other.south
+            and self.east <= other.east
+        )
+
+    def __gt__(self, other):
+        return (
+            self.north >= other.north
+            and self.west <= other.west
+            and self.south <= other.south
+            and self.east >= other.east
+        )
+
+    def integer_bounds(self) -> Bounds:
+        north = self.north if isinstance(self.north, int) else math.ceil(self.north)
+        west = self.west if isinstance(self.west, int) else math.floor(self.west)
+        south = self.south if isinstance(self.south, int) else math.floor(self.south)
+        east = self.east if isinstance(self.east, int) else math.ceil(self.east)
+        return Bounds(north, west, south, east)
 
 
 @dataclass

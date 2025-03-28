@@ -2,6 +2,7 @@ from pathlib import Path
 import pytest
 
 import pytz
+import numpy as np
 
 from geoglue.country import Country
 
@@ -83,5 +84,8 @@ def test_read_shapefiles(country, adm):
     assert adm_cols <= set(country.admin(adm).columns)
 
 
-def test_era5_extents(country):
-    assert country.era5_extents == [24, 102, 8, 110]
+def test_bounds(country):
+    expected_bounds = np.array(
+        [23.39357409300004, 102.14367612700005, 8.403122515000064, 109.46302527100005]
+    )
+    assert np.allclose(np.array(country.bounds), expected_bounds)

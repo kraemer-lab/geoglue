@@ -258,7 +258,7 @@ class ReanalysisSingleLevels:
             "time": TIMES,
             "data_format": "netcdf",
             "download_format": "unarchived",
-            "area": self.country.era5_extents,
+            "area": list(self.country.integer_bounds),  # type: ignore
         }
 
     def get(self, year: int, skip_exists: bool = True) -> CdsPath | None:
