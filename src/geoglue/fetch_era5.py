@@ -44,7 +44,7 @@ def fetch_era5_daily(
         "daily_statistic": statistic,
         "time_zone": f"utc{offset}",
         "frequency": frequency,
-        "area": cc.era5_extents,
+        "area": list(cc.integer_bounds)
     }
 
     client = cdsapi.Client()

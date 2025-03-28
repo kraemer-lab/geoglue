@@ -16,6 +16,7 @@ import geoglue
 
 from .memoryraster import MemoryRaster
 from .util import download_file
+from .types import Bounds
 
 GADM_VERSION = "4.1"
 
@@ -137,9 +138,15 @@ class Country:
                 return all(files)
 
     @property
-    def era5_extents(self) -> list[int]:
+    def bounds(self) -> Bounds:
         minx, miny, maxx, maxy = self.admin(0).total_bounds
-        return [int(maxy) + 1, int(minx), int(miny), int(maxx) + 1]
+        return Bounds(
+            north=float(maxy), west=float(minx), south=float(miny), east=float(maxx)
+        )
+
+    @property
+    def integer_bounds(self) -> Bounds:
+        return self.bounds.integer_bounds()
 
     def population_raster(self, year: int) -> MemoryRaster:
         if year < 2000 or year > 2020:
