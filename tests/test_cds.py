@@ -12,6 +12,7 @@ from geoglue.cds import (
     get_timezone_offset_hours,
     timeshift_hours,
     DatasetPool,
+    grib_to_netcdf,
 )
 
 
@@ -37,7 +38,7 @@ DAYS =  [
 # fmt: on
 
 VARIABLES = ["2m_temperature", "total_precipitation"]
-EXPECTED_REQUEST = {
+EXPECTED_REQUEST_NETCDF = {
     "product_type": ["reanalysis"],
     "variable": VARIABLES,
     "year": ["2020"],
@@ -45,6 +46,18 @@ EXPECTED_REQUEST = {
     "day": DAYS,
     "time": TIMES,
     "data_format": "netcdf",
+    "download_format": "zip",
+    "area": [2, 103, 1, 105],
+}
+
+EXPECTED_REQUEST_GRIB = {
+    "product_type": ["reanalysis"],
+    "variable": VARIABLES,
+    "year": ["2020"],
+    "month": MONTHS,
+    "day": DAYS,
+    "time": TIMES,
+    "data_format": "grib",
     "download_format": "unarchived",
     "area": [2, 103, 1, 105],
 }
@@ -59,16 +72,20 @@ def test_get_timezone_offset_hours(offset, hours):
 
 @pytest.fixture(scope="module")
 def data_singapore():
-    return ReanalysisSingleLevels("SGP", VARIABLES, path=Path("tests/data"))
+    return ReanalysisSingleLevels(
+        "SGP", VARIABLES, path=Path("tests/data"), data_format="netcdf"
+    )
 
 
 @pytest.fixture(scope="module")
 def data_barbados():
-    return ReanalysisSingleLevels("BRB", VARIABLES, path=Path("tests/data"))
+    return ReanalysisSingleLevels(
+        "BRB", VARIABLES, path=Path("tests/data"), data_format="netcdf"
+    )
 
 
 def test_request(data_singapore):
-    assert data_singapore._cdsapi_request(2020) == EXPECTED_REQUEST
+    assert data_singapore._cdsapi_request(2020) == EXPECTED_REQUEST_NETCDF
 
 
 def test_era5_extract_hourly_data():
@@ -93,12 +110,22 @@ def test_get_when_file_exists(mock_client, data_singapore):
 
 
 @patch("cdsapi.Client", autospec=True)
-def test_get(mock_client):
-    ReanalysisSingleLevels("SGP", VARIABLES).get(2020)
+def test_get_netcdf(mock_client):
+    ReanalysisSingleLevels("SGP", VARIABLES, data_format="netcdf").get(2020)
     mock_client().retrieve.assert_called_once_with(
         "reanalysis-era5-single-levels",
-        EXPECTED_REQUEST,
+        EXPECTED_REQUEST_NETCDF,
         Path("~/.local/share/geoglue/SGP/era5/SGP-2020-era5.zip").expanduser(),
+    )
+
+
+@patch("cdsapi.Client", autospec=True)
+def test_get_grib(mock_client):
+    ReanalysisSingleLevels("SGP", VARIABLES, data_format="grib").get(2020)
+    mock_client().retrieve.assert_called_once_with(
+        "reanalysis-era5-single-levels",
+        EXPECTED_REQUEST_GRIB,
+        Path("~/.local/share/geoglue/SGP/era5/SGP-2020-era5.grib").expanduser(),
     )
 
 
@@ -175,8 +202,8 @@ def test_fractional_offset_raises_error():
 
 
 def test_missing_year_datasetpool():
-    pool_sgp = DatasetPool(Path("tests/data").glob("SGP*.nc"), shift_hours=8)
-    pool_brb = DatasetPool(Path("tests/data").glob("BRB*.nc"), shift_hours=-4)
+    pool_sgp = DatasetPool(Path("tests/data").glob("SGP*era5.*.nc"), shift_hours=8)
+    pool_brb = DatasetPool(Path("tests/data").glob("BRB*era5.*.nc"), shift_hours=-4)
 
     with pytest.raises(
         FileNotFoundError, match="Positive shift_hours=8 require preceding year"
@@ -195,12 +222,14 @@ def test_multiple_iso3_datasetpool_raises_error():
     ):
         DatasetPool(Path("tests/data").glob("*.nc"), shift_hours=8)
 
+
 def test_zero_shift_datasetpool():
-    pool = DatasetPool(Path("tests/data").glob("SGP*.nc"), shift_hours=0)
+    pool = DatasetPool(Path("tests/data").glob("SGP*era5.*.nc"), shift_hours=0)
     assert pool[2019] == pool.path(2019).as_dataset()
 
+
 def test_daily_statistics():
-    pool_sgp = DatasetPool(Path("tests/data").glob("SGP*.nc"), shift_hours=8)
+    pool_sgp = DatasetPool(Path("tests/data").glob("SGP*era5.*.nc"), shift_hours=8)
     data = pool_sgp[2020]
     daily = data.daily()
 
@@ -211,3 +240,18 @@ def test_daily_statistics():
     daily_min = data.daily_min()
     assert (daily_min < daily.instant).all()
     assert (daily.instant < daily_max).all()
+
+
+def test_grib_netcdf_match():
+    netcdf = CdsPath(
+        instant=Path("tests/data/SGP-2019-era5.instant.nc"),
+        accum=Path("tests/data/SGP-2019-era5.accum.nc"),
+    ).as_dataset()
+    grib = grib_to_netcdf(
+        Path("tests/data/SGP-2019-era5_grib.grib"), Path("tests/data")
+    ).as_dataset()
+
+    for t in ["instant", "accum"]:
+        grib_t = getattr(grib, t).drop_vars(["number", "surface"])
+        netcdf_t = getattr(netcdf, t).drop_vars(["number", "expver"])
+        assert grib_t.equals(netcdf_t)
