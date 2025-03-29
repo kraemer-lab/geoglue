@@ -27,8 +27,18 @@ from . import data_path
 DAYS = [f"{i:02d}" for i in range(1, 32)]
 MONTHS = [f"{i:02d}" for i in range(1, 13)]
 TIMES = [f"{i:02d}:00" for i in range(24)]
+
 ERA5_HOURLY_ACCUM_FILE = "data_stream-oper_stepType-accum.nc"
 ERA5_HOURLY_INSTANT_FILE = "data_stream-oper_stepType-instant.nc"
+
+CFGRIB_FILTER = {
+    t: {
+        "filter_by_keys": {"stream": ["oper"], "stepType": [t]},
+        "encode_cf": ["parameter", "time", "geography", "vertical"],
+        "time_dims": ["valid_time"],
+    }
+    for t in ["instant", "accum"]
+}
 
 DailyStatistic = Literal["daily_mean", "daily_min", "daily_max", "daily_sum"]
 
@@ -220,6 +230,16 @@ def era5_extract_hourly_data(file: Path, extract_path: Path) -> CdsPath:
         raise ValueError(f"Error extracting hourly data from {file=}")
 
 
+def grib_to_netcdf(file: Path, path: Path) -> CdsPath:
+    assert file.suffix == ".grib"
+    paths = {}
+    for t in ["instant", "accum"]:
+        ds = xr.open_dataset(file, engine="cfgrib", backend_kwargs=CFGRIB_FILTER[t])
+        paths[t] = path / (file.stem + "." + t + ".nc")
+        ds.to_netcdf(paths[t])
+    return CdsPath(**paths)
+
+
 class ReanalysisSingleLevels:
     def __init__(
         self,
@@ -228,6 +248,7 @@ class ReanalysisSingleLevels:
         geo_backend: Literal["gadm", "geoboundaries"] = "gadm",
         path: Path | None = None,
         stub: str = "era5",
+        data_format: Literal["grib", "netcdf"] = "grib",
     ):
         self.iso3 = iso3.upper()
         self.geo_backend = geo_backend
@@ -238,13 +259,18 @@ class ReanalysisSingleLevels:
             path.mkdir(parents=True)
         self.path = path
         self.stub = stub
+        self.data_format: Literal["grib", "netcdf"] = data_format
 
     def __repr__(self):
-        return f"ReanalysisSingleLevels({self.iso3!r}, {self.variables!r}, geo_backend={self.geo_backend!r}, path={self.path!r}, stub={self.stub!r})"
+        return (
+            f"ReanalysisSingleLevels({self.iso3!r}, {self.variables!r}, geo_backend={self.geo_backend!r}, "
+            f"path={self.path!r}, stub={self.stub!r}, data_format={self.data_format!r})"
+        )
 
     def _cdsapi_request(self, year: int) -> dict[str, list[str] | list[int] | str]:
         "Returns cdsapi request dictionary for a given year"
         cur_year = datetime.datetime.now().year
+        download_format = "unarchived" if self.data_format == "grib" else "zip"
         if year < 1940 or year > cur_year:
             raise ValueError(
                 f"ERA5 reanalysis data only available from 1940-{cur_year}"
@@ -256,8 +282,8 @@ class ReanalysisSingleLevels:
             "month": MONTHS,
             "day": DAYS,
             "time": TIMES,
-            "data_format": "netcdf",
-            "download_format": "unarchived",
+            "data_format": self.data_format,
+            "download_format": download_format,
             "area": list(self.country.integer_bounds),  # type: ignore
         }
 
@@ -278,7 +304,8 @@ class ReanalysisSingleLevels:
         -------
             Path of netCDF file that was written to disk
         """
-        outfile = self.path / f"{self.iso3}-{year}-{self.stub}.zip"
+        suffix = "grib" if self.data_format == "grib" else "zip"
+        outfile = self.path / f"{self.iso3}-{year}-{self.stub}.{suffix}"
         accum_file = self.path / f"{self.iso3}-{year}-{self.stub}.accum.nc"
         instant_file = self.path / f"{self.iso3}-{year}-{self.stub}.instant.nc"
         if accum_file.exists() and instant_file.exists():
@@ -292,7 +319,11 @@ class ReanalysisSingleLevels:
                 "reanalysis-era5-single-levels", self._cdsapi_request(year), outfile
             )
         if outfile.exists():
-            return era5_extract_hourly_data(outfile, self.path)
+            match self.data_format:
+                case "grib":
+                    return grib_to_netcdf(outfile, self.path)
+                case "netcdf":
+                    return era5_extract_hourly_data(outfile, self.path)
 
     def get_dataset_pool(self) -> DatasetPool:
         hours = get_timezone_offset_hours(self.country.timezone_offset)
