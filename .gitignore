@@ -10,8 +10,9 @@ __pycache__/
 # C extensions
 *.so
 
-# NetCDF
+# Geospatial data files
 *.nc
+*.grib
 
 # Distribution / packaging
 .Python

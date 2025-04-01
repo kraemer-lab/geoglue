@@ -1,5 +1,6 @@
 import tempfile
 from pathlib import Path
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -13,6 +14,7 @@ from geoglue.cds import (
     timeshift_hours,
     DatasetPool,
     grib_to_netcdf,
+    get_first_monday,
 )
 
 
@@ -208,7 +210,7 @@ def test_missing_year_datasetpool():
     with pytest.raises(
         FileNotFoundError, match="Positive shift_hours=8 require preceding year"
     ):
-        pool_sgp[2019]
+        pool_sgp[2018]
     with pytest.raises(
         FileNotFoundError, match="Negative shift_hours=-4 require succeeding year"
     ):
@@ -252,6 +254,27 @@ def test_grib_netcdf_match():
     ).as_dataset()
 
     for t in ["instant", "accum"]:
-        grib_t = getattr(grib, t).drop_vars(["number", "surface"])
-        netcdf_t = getattr(netcdf, t).drop_vars(["number", "expver"])
-        assert grib_t.equals(netcdf_t)
+        assert getattr(grib, t).equals(getattr(netcdf, t))
+        # grib_t = getattr(grib, t).drop_vars(["number", "surface"])
+        # netcdf_t = getattr(netcdf, t).drop_vars(["number", "expver"])
+        # assert grib_t.equals(netcdf_t)
+
+
+@pytest.mark.parametrize("year,date", [(2025, "2025-01-06"), (2018, "2018-01-01")])
+def test_first_monday(year, date):
+    assert get_first_monday(year) == datetime.fromisoformat(date).date()
+
+
+@pytest.mark.parametrize("window", [0, 6])
+def test_weekly_reduce(data_singapore, window):
+    pool = data_singapore.get_dataset_pool()
+    ds = pool.weekly_reduce(2020, "instant", window=window)
+    diff = ds.valid_time[1] - ds.valid_time[0]
+    assert int(diff / 1e9) == 7 * 24 * 3600  # check that dataset is weekly
+    # assert first and last dates should align to W-MON, closed on the left
+    match window:
+        case 0:
+            assert ds.valid_time.min() == np.datetime64("2020-01-06")
+        case 6:
+            assert ds.valid_time.min() == np.datetime64("2019-11-25")
+    assert ds.valid_time.max() == np.datetime64("2020-12-28")

@@ -31,7 +31,7 @@ TIMES = [f"{i:02d}:00" for i in range(24)]
 
 ERA5_HOURLY_ACCUM_FILE = "data_stream-oper_stepType-accum.nc"
 ERA5_HOURLY_INSTANT_FILE = "data_stream-oper_stepType-instant.nc"
-
+DROP_VARS = ["number", "expver", "surface"]
 CFGRIB_FILTER = {
     t: {
         "filter_by_keys": {"stream": ["oper"], "stepType": [t]},
@@ -41,12 +41,18 @@ CFGRIB_FILTER = {
     for t in ["instant", "accum"]
 }
 
+INSTANT_AGG = ["mean", "min", "max"]
 Reducer = Literal["mean", "min", "max", "sum"]
 
 
 def _is_hourly(ds: xr.Dataset, time_dim: str = "valid_time") -> bool:
     "Returns True if dataset is hourly"
     return sorted(set(ds[time_dim].dt.strftime("%H:%M").to_numpy())) == TIMES
+
+
+def get_first_monday(year: int) -> datetime.date:
+    "Gets first Monday of the year"
+    return datetime.datetime.strptime(f"{year}-W01-1", "%Y-W%W-%u").date()
 
 
 def concat(a: CdsDataset, b: CdsDataset, time_dim: str = "valid_time") -> CdsDataset:
@@ -80,10 +86,10 @@ def get_timezone_offset_hours(offset: str) -> int | None:
     return int(offset.removesuffix(":00"))
 
 
-def _daily_reduce(
-    dataset: xr.Dataset, how: Reducer, dim: str = "valid_time"
+def _time_reduce(
+    dataset: xr.Dataset, freq: str, how: Reducer, dim: str = "valid_time", **kwargs
 ) -> xr.Dataset:
-    resampled = dataset.resample({dim: "D"})
+    resampled = dataset.resample({dim: freq}, **kwargs)
     assert how in ["min", "max", "mean", "sum"]
     return getattr(resampled, how)()
 
@@ -117,15 +123,15 @@ class CdsDataset(NamedTuple):
 
     def daily(self) -> CdsDataset:
         return CdsDataset(
-            instant=_daily_reduce(self.instant, "mean"),
-            accum=_daily_reduce(self.accum, "sum"),
+            instant=_time_reduce(self.instant, "D", "mean"),
+            accum=_time_reduce(self.accum, "D", "sum"),
         )
 
     def daily_max(self) -> xr.Dataset:
-        return _daily_reduce(self.instant, "max")
+        return _time_reduce(self.instant, "D", "max")
 
     def daily_min(self) -> xr.Dataset:
-        return _daily_reduce(self.instant, "min")
+        return _time_reduce(self.instant, "D", "min")
 
     def assign_coords(self, coords: dict) -> CdsDataset:
         return CdsDataset(
@@ -138,9 +144,13 @@ class CdsPath(NamedTuple):
     instant: Path | None
     accum: Path | None
 
-    def as_dataset(self) -> CdsDataset:
+    def as_dataset(self, drop_vars: list[str] = DROP_VARS) -> CdsDataset:
+        instant = xr.open_dataset(self.instant)
+        accum = xr.open_dataset(self.accum)
+        to_drop_instant = set(instant.coords) & set(drop_vars)
+        to_drop_accum = set(accum.coords) & set(drop_vars)
         return CdsDataset(
-            instant=xr.open_dataset(self.instant), accum=xr.open_dataset(self.accum)
+            instant=instant.drop(to_drop_instant), accum=accum.drop(to_drop_accum)
         )
 
     def exists(self) -> bool:
@@ -422,3 +432,87 @@ class DatasetPool:
                 "Improper alignment error: time dimension bounds do not match year bounds"
             )
         return ds
+
+    def weekly_reduce(
+        self,
+        year: int,
+        vartype: Literal["instant", "accum"],
+        how_daily: Reducer | None = None,
+        how_weekly: Reducer | None = None,
+        window: int = 0,
+        time_dim: str = "valid_time",
+    ) -> xr.Dataset:
+        """Returns aggregated weekly dataset, time-shifted to local timezone.
+
+        Dataset is aggregated to isoweeks, with week starting on Monday.
+
+        Parameters
+        ----------
+        year
+            Year to return weekly dataset for
+        vartype
+            One of `instant`, `accum` to select instantaneous or accumulative
+            variables
+        how_daily
+            One of 'min', 'max', 'mean', default='mean'. Operation to aggregate
+            from hourly to daily data. Ignored for accum vars, when we `sum` is used.
+        how_weekly
+            One of 'min', 'max', 'mean', default='mean'. Operation to aggregate
+            from daily to weekly data. Ignored for accum vars, where `sum` is used.
+        window
+            Number of weeks to include before the first ISO week (first Monday
+            of the year). This is useful when performing rolling operations
+            which require `window` elements to be present to avoid NaNs.
+        time_dim
+            Time dimension to use, default='valid_time'
+
+        Returns
+        -------
+        Dataset resampled to weekly frequency, with weeks starting on Monday (ISO weeks)
+        """
+        # Check correct reducer is picked
+        match vartype:
+            case "instant":
+                how_daily = how_daily or "mean"
+                how_weekly = how_weekly or "mean"
+                if how_daily not in INSTANT_AGG or how_weekly not in INSTANT_AGG:
+                    raise ValueError(
+                        f"Invalid aggregation metric for 'instant' variable: {how_daily=} {how_weekly=} must be one of {INSTANT_AGG}"
+                    )
+            case "accum":
+                how_daily = how_daily or "sum"
+                how_weekly = how_weekly or "sum"
+                if how_daily != "sum" or how_weekly != "sum":
+                    raise ValueError(
+                        "Invalid aggregation metric for 'accum' variable: must be 'sum' or unspecified"
+                    )
+        if not self.path(year - 1).exists() or not self.path(year + 1).exists():
+            raise FileNotFoundError(
+                f"Both data for {year - 1} and {year + 1} must be present for weekly statistics for {year=}"
+            )
+
+        if vartype == "accum":
+            logging.info("Accumulative weekly_reduce always uses sum")
+        match vartype:
+            case "instant":
+                ds = _time_reduce(self[year].instant, "D", how_daily)
+                ds_prev = _time_reduce(self[year - 1].instant, "D", how_daily)
+                ds_next = _time_reduce(self[year + 1].instant, "D", how_daily)
+
+            case "accum":
+                ds = _time_reduce(self[year].accum, "D", "sum")
+                ds_prev = _time_reduce(self[year - 1].accum, "D", "sum")
+                ds_next = _time_reduce(self[year + 1].accum, "D", "sum")
+
+        if window > 0:  # needs previous year
+            ds = xr.concat([ds_prev, ds, ds_next], dim=time_dim)
+        else:
+            ds = xr.concat([ds, ds_next], dim=time_dim)
+
+        start_date = get_first_monday(year)
+        end_date = get_first_monday(year + 1) - datetime.timedelta(days=1)
+        if window > 0:
+            start_date -= datetime.timedelta(days=7 * window)
+        ds = ds.sel({time_dim: slice(start_date.isoformat(), end_date.isoformat())})
+
+        return _time_reduce(ds, "W-MON", how_weekly, closed="left", label="left")
