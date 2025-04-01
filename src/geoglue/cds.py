@@ -9,6 +9,7 @@ utilities to time-shift the data to a particular timezone
 from __future__ import annotations
 
 import re
+import logging
 import operator
 import datetime
 import zipfile
@@ -40,7 +41,7 @@ CFGRIB_FILTER = {
     for t in ["instant", "accum"]
 }
 
-DailyStatistic = Literal["daily_mean", "daily_min", "daily_max", "daily_sum"]
+Reducer = Literal["mean", "min", "max", "sum"]
 
 
 def _is_hourly(ds: xr.Dataset, time_dim: str = "valid_time") -> bool:
@@ -79,6 +80,14 @@ def get_timezone_offset_hours(offset: str) -> int | None:
     return int(offset.removesuffix(":00"))
 
 
+def _daily_reduce(
+    dataset: xr.Dataset, how: Reducer, dim: str = "valid_time"
+) -> xr.Dataset:
+    resampled = dataset.resample({dim: "D"})
+    assert how in ["min", "max", "mean", "sum"]
+    return getattr(resampled, how)()
+
+
 class CdsDataset(NamedTuple):
     instant: xr.Dataset
     accum: xr.Dataset
@@ -107,15 +116,16 @@ class CdsDataset(NamedTuple):
         )
 
     def daily(self) -> CdsDataset:
-        instant_mean = self.instant.resample(valid_time="D").mean()
-        accum_sum = self.accum.resample(valid_time="D").sum()
-        return CdsDataset(instant=instant_mean, accum=accum_sum)
+        return CdsDataset(
+            instant=_daily_reduce(self.instant, "mean"),
+            accum=_daily_reduce(self.accum, "sum"),
+        )
 
     def daily_max(self) -> xr.Dataset:
-        return self.instant.resample(valid_time="D").max()
+        return _daily_reduce(self.instant, "max")
 
     def daily_min(self) -> xr.Dataset:
-        return self.instant.resample(valid_time="D").min()
+        return _daily_reduce(self.instant, "min")
 
     def assign_coords(self, coords: dict) -> CdsDataset:
         return CdsDataset(
@@ -376,6 +386,7 @@ class DatasetPool:
         )
 
     def __getitem__(self, year: int) -> CdsDataset:
+        "Returns hourly dataset, time-shifted to local timezone"
         if year not in self.years:
             raise IndexError(
                 f"{year=} not found in DatasetPool, valid years: {self.years}"
