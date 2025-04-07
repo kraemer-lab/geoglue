@@ -12,6 +12,7 @@ import re
 import logging
 import operator
 import datetime
+import warnings
 import zipfile
 from pathlib import Path
 from typing import NamedTuple, Literal, Iterable
@@ -161,11 +162,11 @@ class CdsPath(NamedTuple):
 
 
 def timeshift_hours(
-    ds1: xr.Dataset | CdsDataset,
-    ds2: xr.Dataset | CdsDataset,
+    ds1: xr.Dataset,
+    ds2: xr.Dataset,
     shift: int,
     dim: str = "valid_time",
-) -> xr.Dataset | CdsDataset:
+) -> xr.Dataset:
     """Timeshift dataset by ``shift`` hours.
 
     If ``shift`` is a positive integer (longitude east), then that many hours
@@ -225,12 +226,69 @@ def timeshift_hours(
         ds = ds.isel(**{dim: slice(abs(shift), None)})
 
     time_shift = pd.Timedelta(hours=shift)
-    if isinstance(ds, CdsDataset):
-        time_coord = ds.instant.coords[dim] + time_shift  # type: ignore
-    else:
-        time_coord = ds.coords[dim] + time_shift
-    time_coord = time_coord.assign_attrs({"time_shift": f"{shift}h"})
+    time_coord = (ds.coords[dim] + time_shift).assign_attrs({"time_shift": f"{shift}h"})
     return ds.assign_coords({dim: time_coord})
+
+
+def timeshift_hours_cdsdataset(
+    ds1: CdsDataset,
+    ds2: CdsDataset,
+    shift: int,
+    dim: str = "valid_time",
+) -> xr.Dataset:
+    """Timeshift CdsDataset by a integer number of hours
+
+    This applies timeshift_hours() to the instant and accum parts of a
+    CdsDataset. The main difference from applying timeshift_hours() directly is
+    that we shift the time shift value for the accum dataset by -1. This is due
+    to the fact that the accumulated and mean rate variables represent the hour
+    to the time-stamp, that is, the data time-stamped as YYYY/MM/DD 00:00,
+    represents the accumulation/mean-rate of the data for the time period 23:00
+    to 00:00 for the date YYYY/MM/DD-1. See
+    https://confluence.ecmwf.int/display/CKB/ERA5+family+post-processed+daily+statistics+documentation
+    for context.
+
+    Parameters
+    ----------
+    ds1
+        First dataset, comprises most of the data in returned timeshifted
+        dataset when shift <= 0
+    ds2
+        Second dataset, comprises most of the data in returned timeshifted
+        dataset when shift > 0
+    shift
+        Hours to timeshift, from [-12, 12], excluding 0.
+    dim
+        Name of the time dimension, optional
+
+    Returns
+    -------
+    Timeshifted dataset
+
+    Raises
+    ------
+    ValueError
+        - Raised when shift not in [-12, 12]
+    """
+    match shift:
+        case 0:
+            warnings.warn(
+                "A zero timeshift will not change the 'instant' dataset, but will use ds2 to get the first hour for the 'accum' dataset"
+            )
+            return CdsDataset(
+                instant=ds1.instant,
+                accum=timeshift_hours(ds1.accum, ds2.accum, -1, dim),
+            )
+        case 1:
+            return CdsDataset(
+                instant=timeshift_hours(ds1.instant, ds2.instant, 1, dim),
+                accum=ds2.accum,
+            )
+        case _:
+            return CdsDataset(
+                instant=timeshift_hours(ds1.instant, ds2.instant, shift, dim),
+                accum=timeshift_hours(ds1.accum, ds2.accum, shift - 1, dim),
+            )
 
 
 def era5_extract_hourly_data(file: Path, extract_path: Path) -> CdsPath:
@@ -382,8 +440,14 @@ class DatasetPool:
         self.stub = stubs.pop()
 
         # all files should be hourly data
-        if not all(self.path(year).as_dataset().is_hourly for year in self.years):
-            raise ValueError("shift_hours option only supported for hourly DatasetPool")
+        for year in self.years:
+            d = self.path(year).as_dataset()
+            # TODO: Figure out why directly using 'if not self.path(year).as_dataset().is_hourly:'
+            #       raises a segfault
+            if not d.is_hourly:
+                raise ValueError(
+                    "shift_hours option only supported for hourly DatasetPool"
+                )
         self.shift_hours = shift_hours
 
     def __repr__(self) -> str:
@@ -405,25 +469,23 @@ class DatasetPool:
             return self.path(year).as_dataset()
         if self.shift_hours > 0 and not self.path(year - 1).exists():
             raise FileNotFoundError(
-                f"Positive shift_hours={self.shift_hours} require preceding year at {self.path(year-1)}"
+                f"Positive shift_hours={self.shift_hours} require preceding year at {self.path(year - 1)}"
             )
         if self.shift_hours < 0 and not self.path(year + 1).exists():
             raise FileNotFoundError(
-                f"Negative shift_hours={self.shift_hours} require succeeding year at {self.path(year+1)}"
+                f"Negative shift_hours={self.shift_hours} require succeeding year at {self.path(year + 1)}"
             )
         ds = self.path(year).as_dataset()
         time_dim = ds.get_time_dim()
         time_coord = ds.instant.coords[time_dim]
-        ds = (
-            timeshift_hours(
+        if self.shift_hours > 0:
+            ds = timeshift_hours_cdsdataset(
                 self.path(year - 1).as_dataset(), ds, self.shift_hours, dim=time_dim
             )
-            if self.shift_hours > 0
-            else timeshift_hours(
+        else:
+            ds = timeshift_hours_cdsdataset(
                 ds, self.path(year + 1).as_dataset(), self.shift_hours, dim=time_dim
             )
-        )
-
         assert (ds.instant.coords[time_dim] == ds.accum.coords[time_dim]).all()
         if time_coord.min().values != np.datetime64(
             f"{year}-01-01"

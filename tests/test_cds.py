@@ -11,7 +11,7 @@ from geoglue.cds import (
     era5_extract_hourly_data,
     CdsPath,
     get_timezone_offset_hours,
-    timeshift_hours,
+    timeshift_hours_cdsdataset,
     DatasetPool,
     grib_to_netcdf,
     get_first_monday,
@@ -143,12 +143,13 @@ def test_dataset_pool_positive_time_shift(data_singapore, kind):
     ds19 = pool.path(2019).as_dataset()
 
     # drop valid_time as time coordinates will not match
+    shift = 8 if kind == "instant" else 7
     last_2019_hours = (
-        getattr(ds19, kind).isel(valid_time=slice(-8, None)).drop_vars("valid_time")
+        getattr(ds19, kind).isel(valid_time=slice(-shift, None)).drop_vars("valid_time")
     )
     first_2020_hours = (
         getattr(pool[2020], kind)
-        .isel(valid_time=slice(None, 8))
+        .isel(valid_time=slice(None, shift))
         .drop_vars("valid_time")
     )
     assert last_2019_hours.equals(first_2020_hours)
@@ -162,15 +163,18 @@ def test_dataset_pool_negative_time_shift(data_barbados, kind):
     pool = data_barbados.get_dataset_pool()
     ds20 = pool.path(2020).as_dataset()
 
+    shift = 4 if kind == "instant" else 5
     # drop valid_time as time coordinates will not match
     first_2020_hours = (
-        getattr(ds20, kind).isel(valid_time=slice(None, 4)).drop_vars("valid_time")
+        getattr(ds20, kind).isel(valid_time=slice(None, shift)).drop_vars("valid_time")
     )
+    print(first_2020_hours)
     last_2019_hours = (
         getattr(pool[2019], kind)
-        .isel(valid_time=slice(-4, None))
+        .isel(valid_time=slice(-shift, None))
         .drop_vars("valid_time")
     )
+    print(last_2019_hours)
     assert last_2019_hours.equals(first_2020_hours)
     assert getattr(pool[2019], kind).valid_time.max().values == np.datetime64(
         "2019-12-31T23"
@@ -182,12 +186,10 @@ def test_timeshift_errors(data_barbados):
     ds19 = pool.path(2019).as_dataset()
     ds20 = pool.path(2020).as_dataset()
 
-    with pytest.raises(ValueError, match="No timeshift required for"):
-        timeshift_hours(ds19, ds20, shift=0)
     with pytest.raises(ValueError, match="Timeshift valid for shift=-12..12"):
-        timeshift_hours(ds19, ds20, shift=-13)
+        timeshift_hours_cdsdataset(ds19, ds20, shift=-13)
     with pytest.raises(ValueError, match="Timeshift valid for shift=-12..12"):
-        timeshift_hours(ds19, ds20, shift=15)
+        timeshift_hours_cdsdataset(ds19, ds20, shift=15)
 
 
 def test_era5_extract_hourly_data_raises_error():
