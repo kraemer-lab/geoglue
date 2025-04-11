@@ -55,12 +55,12 @@ class CdoGriddes:
     ysize: int
     xname: str
     yname: str
-    ylongname: str
-    yunits: str
     xfirst: float
     xinc: float
     yfirst: float
     yinc: float
+    ylongname: str = "latitude"
+    yunits: str = "degrees_north"
     xlongname: str = "longitude"
     xunits: str = "degrees_east"
 
