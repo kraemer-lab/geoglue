@@ -10,12 +10,9 @@ from __future__ import annotations
 
 import re
 import datetime
-import tempfile
 import warnings
-from pathlib import Path
 from functools import cache
 
-import cdo
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -23,8 +20,8 @@ import geopandas as gpd
 from tqdm import tqdm
 
 from .util import get_extents
-from .types import CdoGriddes
 from .memoryraster import MemoryRaster
+from .resample import write_cdo_compatible_lonlat
 
 
 class DatasetZonalStatistics:
@@ -90,20 +87,10 @@ class DatasetZonalStatistics:
 
     def to_netcdf(self, path: str, fix_griddes: bool = True):
         "Save NetCDF data"
-        _cdo = cdo.Cdo()
         if not fix_griddes:
             self.dataset.to_netcdf(path)
         else:
-            with tempfile.NamedTemporaryFile(suffix=".nc") as f:
-                self.dataset.to_netcdf(f.name)
-                griddes = CdoGriddes.from_file(f.name)
-                if griddes.gridtype == "generic":
-                    griddes.gridtype = "lonlat"
-                    with tempfile.NamedTemporaryFile(suffix=".txt") as grid_tmp:
-                        Path(grid_tmp.name).write_text(str(griddes))
-                        _cdo.setgrid(grid_tmp.name, input=f.name, output=path)
-            # verify griddes was fixed
-            assert CdoGriddes.from_file(path).gridtype == "lonlat"
+            write_cdo_compatible_lonlat(self.dataset, path)
 
     @cache
     def __getitem__(self, variable: str) -> xr.DataArray:
