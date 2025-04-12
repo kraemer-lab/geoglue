@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pytest
 import numpy as np
+import pandas as pd
 import geopandas as gpd
+import xarray as xr
 
 from geoglue.memoryraster import MemoryRaster
 
@@ -26,3 +28,25 @@ def population_1km(adm2_polygons):
         .mask(adm2_polygons)
         .astype(np.float32)
     )
+
+
+@pytest.fixture(scope="session")
+def temp_dataset():
+    lat = [10, 20]
+    lon = [30, 40]
+    time = pd.date_range("2023-01-01", periods=3)
+
+    # Create some dummy data
+    data = np.random.rand(len(time), len(lat), len(lon))
+
+    # Create the dataset
+    return xr.Dataset(
+        {"temperature": (["time", "latitude", "longitude"], data)},
+        coords={"time": time, "latitude": lat, "longitude": lon},
+    )
+
+
+@pytest.fixture(scope="session")
+def temp_dataset_multiple_time_axes(temp_dataset):
+    valid_time = temp_dataset.time + pd.to_timedelta("6h")
+    return temp_dataset.assign_coords(valid_time=valid_time)

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import math
 import copy
+import tempfile
 from pathlib import Path
 from typing import NamedTuple
 from dataclasses import dataclass, asdict
 
 import numpy as np
+import xarray as xr
 
 from cdo import Cdo
 
@@ -106,6 +108,12 @@ class CdoGriddes:
             new_out.update(kwargs)
         return CdoGriddes(**out)
 
+    @staticmethod
+    def from_dataset(ds: xr.Dataset) -> CdoGriddes:
+        with tempfile.NamedTemporaryFile(prefix="geoglue-", suffix=".nc") as f:
+            ds.to_netcdf(f.name)
+            return CdoGriddes.from_file(f.name)
+        
     def approx_equal(self, other: CdoGriddes, rtol=1e-05, atol=1e-08) -> bool:
         "Approximate equality testing, with absolute (atol) and relative (rtol) tolerance"
         float_fields = ["xfirst", "yfirst", "xinc", "yinc"]
