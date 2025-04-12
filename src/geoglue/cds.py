@@ -23,6 +23,7 @@ import pandas as pd
 import xarray as xr
 
 from .country import Country
+from .util import find_unique_time_coord
 from . import data_path
 
 
@@ -107,12 +108,7 @@ class CdsDataset(NamedTuple):
         return _is_hourly(self.instant) and _is_hourly(self.accum)
 
     def get_time_dim(self) -> str:
-        dim = None
-        for coord_name, coord_data in self.instant.coords.items():
-            if np.issubdtype(coord_data.dtype, np.datetime64):
-                dim = coord_name
-        if dim is None:
-            raise ValueError("No time dimension found")
+        dim = find_unique_time_coord(self.instant)
         if dim not in self.accum.coords:
             raise ValueError(f"Time dimension {dim=} not found in accum dataset")
         return dim

@@ -19,7 +19,7 @@ import xarray as xr
 import geopandas as gpd
 from tqdm import tqdm
 
-from .util import get_extents, set_lonlat_attrs
+from .util import get_extents, set_lonlat_attrs, find_unique_time_coord
 from .memoryraster import MemoryRaster
 
 
@@ -37,21 +37,7 @@ class DatasetZonalStatistics:
         self.dataset = dataset
         self.geom = geom
         self.weighted = weights is not None
-        if time_col is None:
-            matching_cols = [
-                c
-                for c in map(str, self.dataset.variables)
-                if c.endswith("time") or c.startswith("time") or c == "t"
-            ]
-            if matching_cols:
-                self.time_col = matching_cols[0]
-            else:
-                raise ValueError("No time_col supplied and none found by string match")
-        else:
-            assert (
-                time_col in self.dataset.variables
-            ), f"{time_col=} not found in dataset variables"
-            self.time_col = time_col
+        self.time_col = time_col or find_unique_time_coord(time_col)
         self.include_cols = (
             [c for c in self.geom.columns if c != "geometry"]
             if include_cols is None
@@ -100,9 +86,11 @@ class DatasetZonalStatistics:
         weighted: bool | None = None,
         min_date: datetime.date | None = None,
         max_date: datetime.date | None = None,
+        time_col: str | None = None
         const_cols: dict[str, str] | None = None,
     ) -> pd.DataFrame:
-        da = self[variable]
+        da = self.dataset[variable]
+        time = self.dataset["valid_time"]
         weighted = weighted or self.weighted
         # shape after dropping time axis should be identical
         if operation.startswith("area_weighted_sum") and not weighted:

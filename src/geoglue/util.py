@@ -8,6 +8,7 @@ import xarray as xr
 import requests
 import pandas as pd
 import geopandas as gpd
+import numpy as np
 
 
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
@@ -36,6 +37,31 @@ def set_lonlat_attrs(ds: xr.Dataset):
     ds.coords[c_lat].attrs.update(
         {"units": "degrees_north", "standard_name": "latitude", "long_name": "latitude"}
     )
+
+
+def find_time_coords(ds: xr.Dataset) -> list[str]:
+    time_coords = []
+    for coord in ds.coords:
+        # Check if the data type is datetime64
+        if np.issubdtype(ds[coord].dtype, np.datetime64):
+            time_coords.append(coord)
+        # Or check CF conventions
+        elif "units" in ds[coord].attrs and "since" in ds[coord].attrs["units"]:
+            time_coords.append(coord)
+        elif ds[coord].attrs.get("standard_name") == "time":
+            time_coords.append(coord)
+    return time_coords
+
+
+def find_unique_time_coord(ds: xr.Dataset) -> str:
+    coords = find_time_coords(ds)
+    match len(coords):
+        case 0:
+            raise ValueError("No time coordinate found")
+        case 1:
+            return coords[0]
+        case _:
+            raise ValueError(f"No unique time coordinate found: {coords}")
 
 
 def zero_padded_intrange(start: int, end: int, inclusive=True) -> list[str]:
