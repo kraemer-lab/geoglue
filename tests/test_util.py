@@ -1,4 +1,3 @@
-import tempfile
 
 import pytest
 import xarray as xr

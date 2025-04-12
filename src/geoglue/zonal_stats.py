@@ -17,7 +17,6 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import geopandas as gpd
-from tqdm import tqdm
 
 from .util import get_extents, set_lonlat_attrs, find_unique_time_coord
 from .memoryraster import MemoryRaster
@@ -37,15 +36,15 @@ class DatasetZonalStatistics:
         self.dataset = dataset
         self.geom = geom
         self.weighted = weights is not None
-        self.time_col = time_col or find_unique_time_coord(time_col)
+        self.time_col = time_col or find_unique_time_coord(self.dataset)
         self.include_cols = (
             [c for c in self.geom.columns if c != "geometry"]
             if include_cols is None
             else include_cols
         )
-        assert set(self.include_cols) < set(
-            geom.columns
-        ), f"{include_cols=} specifies columns not present in the geometry dataframe"
+        assert set(self.include_cols) < set(geom.columns), (
+            f"{include_cols=} specifies columns not present in the geometry dataframe"
+        )
 
         # auto-fix longitude 0 -- 360
         if float(self.dataset.coords["longitude"].max()) > 180:
@@ -86,11 +85,9 @@ class DatasetZonalStatistics:
         weighted: bool | None = None,
         min_date: datetime.date | None = None,
         max_date: datetime.date | None = None,
-        time_col: str | None = None
         const_cols: dict[str, str] | None = None,
     ) -> pd.DataFrame:
         da = self.dataset[variable]
-        time = self.dataset["valid_time"]
         weighted = weighted or self.weighted
         # shape after dropping time axis should be identical
         if operation.startswith("area_weighted_sum") and not weighted:
@@ -122,7 +119,14 @@ class DatasetZonalStatistics:
         )
         out = pd.DataFrame(data=[], columns=self.include_cols + ["value", "date"])
 
-        for date in tqdm(pd.date_range(min_date, max_date, inclusive="both")):
+        min_datetime64 = np.datetime64(min_date.isoformat())
+        max_datetime64 = np.datetime64(max_date.isoformat() + "T23:59:59")
+        times_in_range = [
+            t
+            for t in self.dataset.coords[self.time_col].values
+            if min_datetime64 <= t <= max_datetime64
+        ]
+        for date in times_in_range:
             rast = MemoryRaster.from_xarray(da.sel({self.time_col: date}))
             if weighted:
                 if not operation.startswith("area_weighted_sum"):
