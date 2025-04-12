@@ -13,6 +13,31 @@ import geopandas as gpd
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
 
 
+def set_lonlat_attrs(ds: xr.Dataset):
+    c_lat, c_lon = None, None
+    if "lat" in ds.coords and "lon" in ds.coords:
+        c_lat = "lat"
+        c_lon = "lon"
+    if "latitude" in ds.coords and "longitude" in ds.coords:
+        c_lat = "latitude"
+        c_lon = "longitude"
+    if c_lat is None or c_lon is None:
+        raise ValueError(
+            "Could not determine latitude and longitude coords, must have either 'lon', 'lat' or 'longitude', 'latitude' columns"
+        )
+    ds.coords[c_lon].attrs.update(
+        {
+            "units": "degrees_east",
+            "standard_name": "longitude",
+            "long_name": "longitude",
+        }
+    )
+
+    ds.coords[c_lat].attrs.update(
+        {"units": "degrees_north", "standard_name": "latitude", "long_name": "latitude"}
+    )
+
+
 def zero_padded_intrange(start: int, end: int, inclusive=True) -> list[str]:
     assert end > start, "End of range must be higher than start of range"
     vals = range(start, end) if not inclusive else range(start, end + 1)

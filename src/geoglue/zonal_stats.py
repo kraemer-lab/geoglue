@@ -19,9 +19,8 @@ import xarray as xr
 import geopandas as gpd
 from tqdm import tqdm
 
-from .util import get_extents
+from .util import get_extents, set_lonlat_attrs
 from .memoryraster import MemoryRaster
-from .resample import write_cdo_compatible_lonlat
 
 
 class DatasetZonalStatistics:
@@ -72,6 +71,7 @@ class DatasetZonalStatistics:
         # Crop data to geometry extents
         extent_long, extent_lat = get_extents(self.geom)
         self.dataset = self.dataset.sel(longitude=extent_long, latitude=extent_lat)
+        set_lonlat_attrs(self.dataset)  # makes dataset cdo compatible
 
         if weights:
             self.weights = weights.mask(self.geom).astype(np.float32)
@@ -85,12 +85,9 @@ class DatasetZonalStatistics:
     def variables(self) -> list[str]:
         return self._variables
 
-    def to_netcdf(self, path: str, fix_griddes: bool = True):
+    def to_netcdf(self, *args, **kwargs):
         "Save NetCDF data"
-        if not fix_griddes:
-            self.dataset.to_netcdf(path)
-        else:
-            write_cdo_compatible_lonlat(self.dataset, path)
+        self.dataset.to_netcdf(*args, **kwargs)
 
     @cache
     def __getitem__(self, variable: str) -> xr.DataArray:
