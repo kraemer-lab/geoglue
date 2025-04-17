@@ -549,8 +549,6 @@ class DatasetPool:
                 f"Both data for {year - 1} and {year + 1} must be present for weekly statistics for {year=}"
             )
 
-        if vartype == "accum":
-            logging.info("Accumulative weekly_reduce always uses sum")
         match vartype:
             case "instant":
                 ds = _time_reduce(self[year].instant, "D", how_daily)
