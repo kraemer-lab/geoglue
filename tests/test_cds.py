@@ -16,6 +16,13 @@ from geoglue.cds import (
     grib_to_netcdf,
     get_first_monday,
 )
+from geoglue.types import Bounds
+
+BOUNDS = {
+    "BRB": Bounds(north=14, west=-59, south=13, east=-58),
+    "SGP": Bounds(north=2, west=103, south=1, east=105),
+}
+TIMEZONES = {"BRB": "-04:00", "SGP": "+08:00"}
 
 
 # fmt: off
@@ -75,14 +82,24 @@ def test_get_timezone_offset_hours(offset, hours):
 @pytest.fixture(scope="module")
 def data_singapore():
     return ReanalysisSingleLevels(
-        "SGP", VARIABLES, path=Path("tests/data"), data_format="netcdf"
+        "SGP",
+        VARIABLES,
+        path=Path("tests/data"),
+        data_format="netcdf",
+        bounds=BOUNDS["SGP"],
+        timezone_offset=TIMEZONES["SGP"],
     )
 
 
 @pytest.fixture(scope="module")
 def data_barbados():
     return ReanalysisSingleLevels(
-        "BRB", VARIABLES, path=Path("tests/data"), data_format="netcdf"
+        "BRB",
+        VARIABLES,
+        path=Path("tests/data"),
+        data_format="netcdf",
+        bounds=BOUNDS["BRB"],
+        timezone_offset=TIMEZONES["BRB"],
     )
 
 
@@ -113,7 +130,13 @@ def test_get_when_file_exists(mock_client, data_singapore):
 
 @patch("cdsapi.Client", autospec=True)
 def test_get_netcdf(mock_client):
-    ReanalysisSingleLevels("SGP", VARIABLES, data_format="netcdf").get(2020)
+    ReanalysisSingleLevels(
+        "SGP",
+        VARIABLES,
+        data_format="netcdf",
+        bounds=BOUNDS["SGP"],
+        timezone_offset=TIMEZONES["SGP"],
+    ).get(2020)
     mock_client().retrieve.assert_called_once_with(
         "reanalysis-era5-single-levels",
         EXPECTED_REQUEST_NETCDF,
@@ -123,7 +146,13 @@ def test_get_netcdf(mock_client):
 
 @patch("cdsapi.Client", autospec=True)
 def test_get_grib(mock_client):
-    ReanalysisSingleLevels("SGP", VARIABLES, data_format="grib").get(2020)
+    ReanalysisSingleLevels(
+        "SGP",
+        VARIABLES,
+        data_format="grib",
+        bounds=BOUNDS["SGP"],
+        timezone_offset=TIMEZONES["SGP"],
+    ).get(2020)
     mock_client().retrieve.assert_called_once_with(
         "reanalysis-era5-single-levels",
         EXPECTED_REQUEST_GRIB,

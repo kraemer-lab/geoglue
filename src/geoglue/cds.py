@@ -9,7 +9,6 @@ utilities to time-shift the data to a particular timezone
 from __future__ import annotations
 
 import re
-import logging
 import operator
 import datetime
 import warnings
@@ -23,6 +22,7 @@ import pandas as pd
 import xarray as xr
 
 from .country import Country
+from .types import Bounds
 from .util import find_unique_time_coord
 from . import data_path
 
@@ -323,10 +323,23 @@ class ReanalysisSingleLevels:
         path: Path | None = None,
         stub: str = "era5",
         data_format: Literal["grib", "netcdf"] = "grib",
+        bounds: Bounds | None = None,
+        timezone_offset: str | None = None,
     ):
         self.iso3 = iso3.upper()
         self.geo_backend = geo_backend
-        self.country = Country(iso3, backend=geo_backend)
+        if (bounds is None) ^ (timezone_offset is None):
+            raise ValueError(
+                "Either none or both of bounds and timezone_offset must be specified"
+            )
+        if bounds and timezone_offset:
+            self.bounds = bounds
+            self.timezone_offset = timezone_offset
+        else:
+            # use country object to obtain bounds and timezone offset
+            country = Country(iso3, backend=geo_backend)
+            self.bounds = country.integer_bounds
+            self.timezone_offset = country.timezone_offset
         self.variables = variables
         path = path or data_path / iso3 / "era5"
         if not path.exists():
@@ -358,7 +371,7 @@ class ReanalysisSingleLevels:
             "time": TIMES,
             "data_format": self.data_format,
             "download_format": download_format,
-            "area": list(self.country.integer_bounds),  # type: ignore
+            "area": list(self.bounds),  # type: ignore
         }
 
     def get(self, year: int, skip_exists: bool = True) -> CdsPath | None:
@@ -400,10 +413,10 @@ class ReanalysisSingleLevels:
                     return era5_extract_hourly_data(outfile, self.path)
 
     def get_dataset_pool(self) -> DatasetPool:
-        hours = get_timezone_offset_hours(self.country.timezone_offset)
+        hours = get_timezone_offset_hours(self.timezone_offset)
         if hours is None:
             raise ValueError(
-                f"Can't perform timeshift for fractional timezone offset: {self.country.timezone_offset}"
+                f"Can't perform timeshift for fractional timezone offset: {self.timezone_offset}"
             )
         return DatasetPool(
             self.path.glob(f"{self.iso3}-????-{self.stub}.*.nc"), shift_hours=hours
