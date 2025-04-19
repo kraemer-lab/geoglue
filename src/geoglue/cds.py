@@ -147,7 +147,7 @@ class CdsPath(NamedTuple):
         to_drop_instant = set(instant.coords) & set(drop_vars)
         to_drop_accum = set(accum.coords) & set(drop_vars)
         return CdsDataset(
-            instant=instant.drop(to_drop_instant), accum=accum.drop(to_drop_accum)
+            instant=instant.drop_vars(to_drop_instant), accum=accum.drop_vars(to_drop_accum)
         )
 
     def exists(self) -> bool:
