@@ -153,7 +153,7 @@ class Country:
             raise ValueError(
                 "Current population source 'worldpop' only has data from 2000-2020"
             )
-        url = f"https://data.worldpop.org/GIS/Population/Global_2000_2020_1km_UNadj/{year}/VNM/vnm_ppp_{year}_1km_Aggregated_UNadj.tif"
+        url = f"https://data.worldpop.org/GIS/Population/Global_2000_2020_1km_UNadj/{year}/{self.iso3}/{self.iso3.lower()}_ppp_{year}_1km_Aggregated_UNadj.tif"
         output_path = self.path_population / url.split("/")[-1]
         if output_path.exists() or download_file(url, output_path):
             return MemoryRaster.read(output_path)
