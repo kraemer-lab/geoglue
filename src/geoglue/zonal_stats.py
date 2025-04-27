@@ -32,6 +32,7 @@ class DatasetZonalStatistics:
         weights: MemoryRaster | None = None,
         include_cols: list[str] | None = None,
         time_col: str | None = None,
+        crop_dataset_to_geometry: bool = False,
     ):
         self.dataset = dataset
         self.geom = geom
@@ -53,10 +54,15 @@ class DatasetZonalStatistics:
             ) % 360 - 180
             self.dataset = self.dataset.sortby(self.dataset.longitude)
         self.dataset = self.dataset.sortby(self.dataset.latitude, ascending=False)
-        # Crop data to geometry extents
-        extent_long, extent_lat = get_extents(self.geom)
-        self.dataset = self.dataset.sel(longitude=extent_long, latitude=extent_lat)
-        set_lonlat_attrs(self.dataset)  # makes dataset cdo compatible
+
+        # Crop data to geometry extents [off by default]
+        # NOTE: This can give mismatches in shape with weights and is unnecessary if
+        #       the original dataset matches weights extents via a cdo resample. This
+        #       is because geoglue.resample does not take geometry into account.
+        if crop_dataset_to_geometry:
+            extent_long, extent_lat = get_extents(self.geom)
+            self.dataset = self.dataset.sel(longitude=extent_long, latitude=extent_lat)
+            set_lonlat_attrs(self.dataset)  # makes dataset cdo compatible
 
         if weights:
             self.weights = weights.mask(self.geom).astype(np.float32)
