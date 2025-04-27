@@ -432,8 +432,9 @@ class DatasetPool:
         # check that all files have the same stub
         matches = [regex.match(f.name) for f in self.paths]
         match_groups = [m.groups() for m in matches if m]
-        if len(set(p.parent for p in self.paths)) != 1:
-            raise ValueError("All files in DatasetPool must be in same folder")
+        parents = set(p.parent for p in self.paths)
+        if len(parents) != 1:
+            raise ValueError(f"All files in DatasetPool must be in same folder, found multiple parent folders: {parents}")
         self.folder = self.paths[0].parent
         iso3 = set(map(operator.itemgetter(0), match_groups))
         stubs = set(map(operator.itemgetter(2), match_groups))
