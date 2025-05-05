@@ -162,7 +162,7 @@ def timeshift_hours(
     ds2: xr.Dataset,
     shift: int,
     dim: str = "valid_time",
-) -> xr.Dataset:
+    ) -> xr.Dataset:
     """Timeshift dataset by ``shift`` hours.
 
     If ``shift`` is a positive integer (longitude east), then that many hours
@@ -205,24 +205,16 @@ def timeshift_hours(
     if shift < -12 or shift > 12:
         raise ValueError(f"Timeshift valid for shift=-12..12, provided {shift=}")
     if shift > 0:
-        ds1 = ds1.isel(**{dim: slice(-shift, None)})
-        ds = (
-            concat(ds1, ds2)
-            if isinstance(ds1, CdsDataset)
-            else xr.concat([ds1, ds2], dim=dim)
-        )
-        ds = ds.isel(**{dim: slice(None, -shift)})
+        ds1 = ds1.isel(**{dim: slice(-shift, None)})  # type: ignore
+        ds = xr.concat([ds1, ds2], dim=dim)
+        ds = ds.isel(**{dim: slice(None, -shift)})  # type: ignore
     else:
-        ds2 = ds2.isel(**{dim: slice(None, abs(shift))})
-        ds = (
-            concat(ds1, ds2)
-            if isinstance(ds1, CdsDataset)
-            else xr.concat([ds1, ds2], dim=dim)
-        )
-        ds = ds.isel(**{dim: slice(abs(shift), None)})
+        ds2 = ds2.isel(**{dim: slice(None, abs(shift))})  # type: ignore
+        ds = xr.concat([ds1, ds2], dim=dim)
+        ds = ds.isel(**{dim: slice(abs(shift), None)})  # type: ignore
 
     time_shift = pd.Timedelta(hours=shift)
-    time_coord = (ds.coords[dim] + time_shift).assign_attrs({"time_shift": f"{shift}h"})
+    time_coord = (ds.coords[dim] + time_shift).assign_attrs({"time_shift": f"{shift}h"})  # type: ignore
     return ds.assign_coords({dim: time_coord})
 
 
@@ -231,7 +223,7 @@ def timeshift_hours_cdsdataset(
     ds2: CdsDataset,
     shift: int,
     dim: str = "valid_time",
-) -> xr.Dataset:
+) -> CdsDataset:
     """Timeshift CdsDataset by a integer number of hours
 
     This applies timeshift_hours() to the instant and accum parts of a
