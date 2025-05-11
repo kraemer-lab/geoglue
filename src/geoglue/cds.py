@@ -1,7 +1,4 @@
 """
-cdsapi helper utility module
-----------------------------
-
 This module uses ECMWF's ``cdsapi`` to downloads ERA5 hourly data and provides
 utilities to time-shift the data to a particular timezone
 """
@@ -97,6 +94,16 @@ def _time_reduce(
 
 
 class CdsDataset(NamedTuple):
+    """
+    Tuple containing instant and accumulated variables from cdsapi
+
+    Members
+    -------
+    instant
+        Instant variables, such as temperature and wind speed
+    accum
+        Accumulated variables, such as total precipitation and surface solar radiation
+    """
     instant: xr.Dataset
     accum: xr.Dataset
 
@@ -105,32 +112,39 @@ class CdsDataset(NamedTuple):
 
     @property
     def is_hourly(self) -> bool:
+        "Returns whether dataset has hourly intervals"
         return _is_hourly(self.instant) and _is_hourly(self.accum)
 
     def get_time_dim(self) -> str:
+        "Returns time dimension of the dataset"
         dim = find_unique_time_coord(self.instant)
         if dim not in self.accum.coords:
             raise ValueError(f"Time dimension {dim=} not found in accum dataset")
         return dim
 
     def isel(self, **kwargs) -> CdsDataset:
+        "Select slices from both instant and accumulated datasets"
         return CdsDataset(
             instant=self.instant.isel(**kwargs), accum=self.accum.isel(**kwargs)
         )
 
     def daily(self) -> CdsDataset:
+        "Returns CdsDataset corresponding to daily aggregation, mean for instant, sum for accumulated variables"
         return CdsDataset(
             instant=_time_reduce(self.instant, "D", "mean"),
             accum=_time_reduce(self.accum, "D", "sum"),
         )
 
     def daily_max(self) -> xr.Dataset:
+        "Daily maximum of instant variable dataset"
         return _time_reduce(self.instant, "D", "max")
 
     def daily_min(self) -> xr.Dataset:
+        "Daily minimum of instant variable dataset"
         return _time_reduce(self.instant, "D", "min")
 
     def assign_coords(self, coords: dict) -> CdsDataset:
+        "Assigns coordinates to instant and accumulated variable datasets"
         return CdsDataset(
             instant=self.instant.assign_coords(coords),
             accum=self.accum.assign_coords(coords),
@@ -138,10 +152,28 @@ class CdsDataset(NamedTuple):
 
 
 class CdsPath(NamedTuple):
+    """
+    Tuple containing paths to instant and accumulated variables from cdsapi
+
+    Members
+    -------
+    instant
+        Path to instant variable dataset
+    accum
+        Path to accumulated variable dataset
+    """
     instant: Path | None
     accum: Path | None
 
     def as_dataset(self, drop_vars: list[str] = DROP_VARS) -> CdsDataset:
+        """
+        Returns opened datasets for instant and accumulated variables
+
+        Parameters
+        ----------
+        drop_vars
+            Variables to drop, default=['number', 'expver', 'surface']
+        """
         instant = xr.open_dataset(self.instant)
         accum = xr.open_dataset(self.accum)
         to_drop_instant = set(instant.coords) & set(drop_vars)
@@ -151,6 +183,7 @@ class CdsPath(NamedTuple):
         )
 
     def exists(self) -> bool:
+        "Returns True if dataset exists"
         assert self.instant or self.accum  # either must be present
         return (self.instant is None or self.instant.exists()) and (
             self.accum is None or self.accum.exists()
@@ -256,7 +289,7 @@ def timeshift_hours_cdsdataset(
     Raises
     ------
     ValueError
-        - Raised when shift not in [-12, 12]
+        Raised when shift not in [-12, 12]
     """
     match shift:
         case 0:
@@ -280,7 +313,20 @@ def timeshift_hours_cdsdataset(
 
 
 def era5_extract_hourly_data(file: Path, extract_path: Path) -> CdsPath:
-    "Extracts hourly data from downloaded zip file"
+    """Extracts hourly data from downloaded zip file
+
+    Parameters
+    ----------
+    file
+        zip file to open
+    extract_path
+        Path to extract to
+
+    Returns
+    -------
+    CdsPath
+        Path to extracted dataset
+    """
     if file.suffix != ".zip":
         raise ValueError(f"Not a valid zip {file=}")
     instant_file, accum_file = None, None
@@ -297,6 +343,20 @@ def era5_extract_hourly_data(file: Path, extract_path: Path) -> CdsPath:
 
 
 def grib_to_netcdf(file: Path, path: Path) -> CdsPath:
+    """Converts GRIB to netCDF
+
+    Parameters
+    ----------
+    file
+        GRIB file to open
+    path
+        Parent folder to save netCDF files
+
+    Returns
+    -------
+    CdsPath
+        Path to converted netCDF dataset
+    """
     assert file.suffix == ".grib"
     paths = {}
     for t in ["instant", "accum"]:
@@ -307,6 +367,17 @@ def grib_to_netcdf(file: Path, path: Path) -> CdsPath:
 
 
 class ReanalysisSingleLevels:
+    """Fetch ERA5 reanalysis data from cdsapi for a particular country
+
+    Attributes
+    ----------
+    iso3 : ISO 3166-2 3-letter country code
+    geo_backend : One of `gadm` or `geoboundaries`. Default is `gadm`
+    variables : List of variables to fetch
+    path : Data path to download data to
+    stub : Stub to use in filename, defau/n=`era5`. This is used as part of the downloaded filename, e.g. VNM-2020-stub.accum.nc
+    data_format : Data format to download files in, one of `grib` or `netcdf`, default=`grib`
+    """
     def __init__(
         self,
         iso3: str,
@@ -381,6 +452,7 @@ class ReanalysisSingleLevels:
 
         Returns
         -------
+        CdsPath
             Path of netCDF file that was written to disk
         """
         suffix = "grib" if self.data_format == "grib" else "zip"
@@ -405,6 +477,7 @@ class ReanalysisSingleLevels:
                     return era5_extract_hourly_data(outfile, self.path)
 
     def get_dataset_pool(self) -> DatasetPool:
+        "Returns DatasetPool corresponding to downloaded data"
         hours = get_timezone_offset_hours(self.timezone_offset)
         if hours is None:
             raise ValueError(
@@ -416,8 +489,18 @@ class ReanalysisSingleLevels:
 
 
 class DatasetPool:
+    "Collection of ERA5 reanalysis data"
     def __init__(self, paths: Iterable[Path], shift_hours: int = 0):
-        """Instantiates a pool of yearly downloaded data that allows time-shifting"""
+        """Instantiates a pool of yearly downloaded data that allows time-shifting
+
+        Parameters
+        ----------
+        paths : Iterable[Path]
+            Paths that will be used to instantiate the dataset pool. All files in the DatasetPool
+            must be in the same folder.
+        shift_hours : int
+            Integral number of hours to time shift the data, ranges from -12 to 12
+        """
         self.paths = list(paths)
 
         regex = re.compile(r"^([A-Z]{3})-(\d{4})-(.*?)\.(instant|accum)\.nc$")
@@ -456,13 +539,14 @@ class DatasetPool:
         return f"DatasetPool(shift_hours={self.shift_hours}, paths={self.paths!r}"
 
     def path(self, year: int) -> CdsPath:
+        "Returns CdsDataset corresponding to a particular year"
         return CdsPath(
             instant=self.folder / f"{self.iso3}-{year}-{self.stub}.instant.nc",
             accum=self.folder / f"{self.iso3}-{year}-{self.stub}.accum.nc",
         )
 
     def __getitem__(self, year: int) -> CdsDataset:
-        "Returns hourly dataset, time-shifted to local timezone"
+        "Returns hourly dataset for a particular year, time-shifted to local timezone"
         if year not in self.years:
             raise IndexError(
                 f"{year=} not found in DatasetPool, valid years: {self.years}"
@@ -532,7 +616,8 @@ class DatasetPool:
 
         Returns
         -------
-        Dataset resampled to weekly frequency, with weeks starting on Monday (ISO weeks)
+        xr.Dataset
+            Dataset resampled to weekly frequency, with weeks starting on Monday (ISO weeks)
         """
         # Check correct reducer is picked
         match vartype:

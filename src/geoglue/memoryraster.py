@@ -53,6 +53,18 @@ def get_numpy_dtype(t: str):
 
 @dataclasses.dataclass
 class MemoryRaster:
+    """Class to operate on rasters in-memory
+
+    Attributes
+    ----------
+    data : Data to consider as raster
+    transform : Affine transformation associated with raster
+    crs : Coordinate reference system associated with raster
+    nodata : Data value indicating NA
+    origin_path : Path to source file
+    dtype : numpy dtype of array
+    driver : rasterio driver, optional, default='GTiff'
+    """
     data: np.ndarray | np.ma.MaskedArray | xr.DataArray
     transform: affine.Affine
     crs: str | pyproj.crs.CRS | None
@@ -63,6 +75,7 @@ class MemoryRaster:
 
     @property
     def is_lonlat(self):
+        "Returns whether grid is longitude and latitude"
         return self.crs is not None and (
             (isinstance(self.crs, pyproj.crs.CRS) and self.crs.to_epsg() == 4326)
             or "4326" in str(self.crs)
@@ -70,14 +83,17 @@ class MemoryRaster:
 
     @property
     def shape(self):
+        "Shape (width, height) of raster image"
         return self.data.shape  # type: ignore
 
     @property
     def width(self):
+        "Width of raster image"
         return self.shape[1]
 
     @property
     def height(self):
+        "Height of raster image"
         return self.shape[0]
 
     @property
@@ -95,6 +111,7 @@ class MemoryRaster:
 
     @property
     def griddes(self) -> CdoGriddes:
+        "Returns grid description that can be used by cdo to resample"
         if not self.is_lonlat:
             raise ValueError(
                 "Only EPSG:4326 (WGS84) CRS latitude/longitude is supported.\n"
@@ -136,12 +153,15 @@ class MemoryRaster:
         )
 
     def min(self) -> float:
+        "Minimum value in raster"
         return np.ma.min(self.data)
 
     def max(self) -> float:
+        "Maximum value in raster"
         return np.ma.max(self.data)
 
     def sum(self) -> float:
+        "Sum of non-null values in raster"
         return np.ma.sum(self.data)
 
     def __repr__(self):
@@ -159,7 +179,24 @@ class MemoryRaster:
         c_latitude="latitude",
         nodata: int | float | None = None,
     ) -> MemoryRaster:
-        "Creates MemoryRaster from xarray, assumes EPSG:4326"
+        """Creates MemoryRaster from xarray, assumes EPSG:4326
+
+        Parameters
+        ----------
+        da
+            xarray DataArray from which to create MemoryRaster
+        c_longitude
+            Longitude axis in dataarray, default='longitude'
+        c_latitude
+            Latitude axis in dataarray, default='latitude'
+        nodata
+            Data value representing NA, optional. If not specified, tries to read
+            from xarray attributes such as `GRIB_missingValue`, `nodata`, `_FillValue`
+
+        Returns
+        -------
+        MemoryRaster
+        """
         da = da.sortby(da.latitude, ascending=False)
         attrs = da.attrs
 
@@ -190,7 +227,23 @@ class MemoryRaster:
         crs: str | None = None,
         resampling: rasterio.enums.Resampling = rasterio.enums.Resampling.bilinear,
     ) -> MemoryRaster:
-        "Reads from a file supported by rasterio"
+        """Reads from a file supported by rasterio
+
+        Parameters
+        ----------
+        file
+            File to read from, must be openable by rasterio
+        crs
+            Coordinate reference system to project to
+        resampling
+            If reprojecting to another CRS, resampling strategy to use. Must
+            be a strategy supported by rasterio
+
+
+        Returns
+        -------
+        MemoryRaster
+        """
 
         with rasterio.open(file) as src:
             if src.count != 1:
@@ -239,6 +292,7 @@ class MemoryRaster:
 
     @contextmanager
     def as_rasterio(self, zfill: bool = False):
+        "Returns MemoryRaster as a rasterio dataset"
         with MemoryFile() as memfile:
             if zfill and np.ma.isMaskedArray(self.data):
                 data = self.data.filled(0)  # type: ignore
@@ -262,6 +316,10 @@ class MemoryRaster:
         crop
             Whether to crop the extent to the geometry specified, default=True. This
             is passed directly to rasterio.mask.mask.
+
+        Returns
+        -------
+        MemoryRaster
         """
         if isinstance(geometry, gpd.GeoDataFrame):
             # reassign geometry to GeoSeries
@@ -279,6 +337,7 @@ class MemoryRaster:
                 )
 
     def plot(self, cmap: str = DEFAULT_COLORMAP, fill_nodata=None, **kwargs):
+        "Plots a MemoryRaster using sensible defaults"
         if fill_nodata is None:
             return rasterio.plot.show(
                 self.data, transform=self.transform, cmap=cmap, **kwargs
@@ -292,6 +351,7 @@ class MemoryRaster:
             )
 
     def astype(self, t) -> MemoryRaster:
+        "Returns a new MemoryRaster with type cast to t"
         out = copy.deepcopy(self)
         out.data = out.data.astype(t)
         out.dtype = t.__name__
@@ -304,7 +364,10 @@ class MemoryRaster:
     ) -> MemoryRaster:
         """Resamples source raster to match destination mask
 
-        NOTE: This function is not working at the moment
+        ..note:: This function is meant to be used for resampling MemoryRaster,
+                 usually those created from GeoTIFF files. For data already in
+                 netCDF format, we recommend using Climate Data Operator (cdo)'s
+                 resampling functions, for which we provide a wrapper.
 
         Parameters
         ----------
@@ -312,6 +375,11 @@ class MemoryRaster:
             Destination MemoryRaster
         resampling
             Resampling method, one of `rasterio.enums.Resampling`
+
+        See Also
+        --------
+        geoglue.resample
+            Resample module with wrappers for cdo resample
         """
         # drop the first index (1)
         height, width = dst.shape  # type: ignore
@@ -341,8 +409,28 @@ class MemoryRaster:
         weights: MemoryRaster | None = None,
         **kwargs,
     ) -> pd.DataFrame | gpd.GeoDataFrame:
-        "Calculate zonal statistics using exactextract"
 
+        """Calculate zonal statistics using exactextract
+
+        Parameters
+        ----------
+        geometry : gpd.GeoDataFrame
+            Geometry dataframe, usually read from a shapefile
+        ops : str | list[str] | Callable
+            exactextract operation(s) to perform
+        weights : MemoryRaster | None
+            Optional, if specified uses the supplied raster to perform weighted
+            zonal statistics
+        **kwargs
+            Extra parameters passed directly to exactextract.exact_extract()
+
+        Returns
+        -------
+        pd.DataFrame | gpd.GeoDataFrame
+            A copy of the geometry dataframe with additional column(s) with
+            the zonal statistics requested. Each separate zonal statistic is
+            given a column in the data
+        """
         with self.as_rasterio() as raster:
             if weights:
                 with weights.as_rasterio(zfill=True) as weights_raster:

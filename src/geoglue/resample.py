@@ -37,7 +37,8 @@ def resample(
 
     Returns
     -------
-    Resampled dataset path
+    Path
+        Resampled dataset path
     """
 
     _cdo = cdo.Cdo()
