@@ -1,4 +1,8 @@
-"Country information for a given ISO3 code, including geospatial data from GADM"
+"""
+This module contains the Country class that fetches geospatial data
+(from GADM or geoBoundaries) for a particular country. It also supports
+calculating extents or geospatial bounds, and calculating timezone offsets.
+"""
 
 import datetime
 from functools import cache
@@ -8,6 +12,7 @@ from pathlib import Path
 import pytz
 import pycountry
 import requests
+import pandas as pd
 import geopandas as gpd
 
 import warnings
@@ -29,17 +34,7 @@ SUPPORTED_BACKENDS = ["gadm", "geoboundaries"]
 Backend = Literal["gadm", "geoboundaries"]
 MAX_ADMIN: dict[Backend, int] = {"gadm": 3, "geoboundaries": 2}
 
-# Date used to localize the timezone obtained from pytz. Timezone
-# names (such as Europe/Berlin) do not have a fixed offset due to daylight
-# savings time changes, and the same timezone can have a different offset,
-# usually in summer months. The exact date when DST starts also varies by year
-# according to local policy shifts. We pick a specific date here to ensure that
-# the localization is reproducible. The date is taken to be in the middle of
-# winter in the Northern hemisphere when DST does not apply and the
-# time offset follows standard time. For countries in the Southern hemisphere,
-# the choice of this date may lead to non-standard (daylight savings) time
-# being used. Users can override the date used for localisation by passing the
-# localize_date parameter to the Country constructor.
+# See significance of LOCALIZE_DATE in the Country constructor docstring
 LOCALIZE_DATE = datetime.datetime(2022, 1, 1)
 
 
@@ -68,6 +63,42 @@ class Country:
         timezone: pytz.BaseTzInfo | None = None,
         fetch_data: bool = True,
     ):
+        """Constructs a Country class given an ISO3 code
+
+        Parameters
+        ----------
+        iso3 : str
+            ISO 3166-2 3-letter alpha code
+        gadm_version : str
+            If using GADM, GADM version to download, default=4.1
+        crs : str
+            Coordinate Reference System (CRS) to project downloaded geospatial data.
+            Default is EPSG:4326, representing latitude and longitude
+        backend : Backend
+            Backend, must be one of `gadm` or `geoboundaries`
+        localize_date : datetime.datetime
+            Date where timezone is localised to, default=2022-01-01.
+
+            Date used to localize the timezone obtained from pytz. Timezone
+            names (such as Europe/Berlin) do not have a fixed offset due to daylight
+            savings time changes, and the same timezone can have a different offset,
+            usually in summer months. The exact date when DST starts also varies by year
+            according to local policy shifts. We pick a specific date here to ensure that
+            the localization is reproducible. The date is taken to be in the middle of
+            winter in the Northern hemisphere when DST does not apply and the
+            time offset follows standard time. For countries in the Southern hemisphere,
+            the choice of this date may lead to non-standard (daylight savings) time
+            being used.
+        data_path : Path | None
+            Data path to download data, by default ~/.local/share/geoglue
+        timezone : pytz.BaseTzInfo | None
+            Timezone, if not specified will be determined from country ISO3 code. The default
+            mechanism works fine for countries with a unique timezone, but may not
+            select the intended timezone for countries spanning multiple timezones.
+        fetch_data : bool
+            Whether to fetch data on initialisation, default=True. If set to False, data
+            can be fetched later by calling fetch_shapefiles()
+        """
         self.iso3 = iso3.upper()
         self.version = gadm_version if backend == "gadm" else None
         self.backend: Backend = backend
@@ -139,6 +170,7 @@ class Country:
 
     @property
     def bounds(self) -> Bounds:
+        "Returns geographic bounds of the country"
         minx, miny, maxx, maxy = self.admin(0).total_bounds
         return Bounds(
             north=float(maxy), west=float(minx), south=float(miny), east=float(maxx)
@@ -146,9 +178,24 @@ class Country:
 
     @property
     def integer_bounds(self) -> Bounds:
+        "Integral geographic bounds of the country"
         return self.bounds.integer_bounds()
 
     def population_raster(self, year: int) -> MemoryRaster:
+        """Downloads and returns WorldPop population raster (1km resolution) for a particular year
+
+        Data is only available from 2000-2020.
+
+        Parameters
+        ----------
+        year : int
+            Year for which to download data
+
+        Returns
+        -------
+        MemoryRaster
+            MemoryRaster representing the population data
+        """
         if year < 2000 or year > 2020:
             raise ValueError(
                 "Current population source 'worldpop' only has data from 2000-2020"
@@ -168,7 +215,8 @@ class Country:
                 return ["shapeID", "shapeName"]
 
     @cache
-    def admin(self, adm: int):
+    def admin(self, adm: int) -> pd.DataFrame:
+        "Returns administrative area dataframe with geometry for admin level `adm`, one of 1-3"
         if adm > MAX_ADMIN[self.backend]:
             raise ValueError(f"Unsupported {adm=} for backend={self.backend!r}")
 

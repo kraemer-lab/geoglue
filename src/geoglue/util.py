@@ -15,6 +15,17 @@ COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
 
 
 def set_lonlat_attrs(ds: xr.Dataset):
+    """Sets CF-compliant grid attributes
+
+    Sets grid attributes so that cdo can recognise the grid as `lonlat`
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Dataset that is modified in place with the grid attributes. The
+        dataset must have coordinates named either `lat`, `lon` or
+        `latitude`, `longitude` to set grid attributes correctly
+    """
     c_lat, c_lon = None, None
     if "lat" in ds.coords and "lon" in ds.coords:
         c_lat = "lat"
@@ -40,6 +51,7 @@ def set_lonlat_attrs(ds: xr.Dataset):
 
 
 def find_time_coords(ds: xr.Dataset) -> list[str]:
+    "Lists all time coordinates (dtype `np.datetime64`)"
     time_coords = []
     for coord in ds.coords:
         # Check if the data type is datetime64
@@ -54,6 +66,7 @@ def find_time_coords(ds: xr.Dataset) -> list[str]:
 
 
 def find_unique_time_coord(ds: xr.Dataset) -> str:
+    "Finds unique time coordinate or raises a ValueError"
     coords = find_time_coords(ds)
     match len(coords):
         case 0:

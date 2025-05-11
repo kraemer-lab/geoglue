@@ -49,7 +49,12 @@ class Bounds(NamedTuple):
 
 @dataclass
 class CdoGriddes:
-    "Grid specification"
+    """Grid specification used by Climate Data Operators (CDO)
+
+    This class represents a grid description as specified by the
+    Climate Data Operators (cdo) program, with functionality to read
+    and write grid descriptions from files.
+    """
 
     gridtype: str
     gridsize: int
