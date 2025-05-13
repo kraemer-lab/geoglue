@@ -52,7 +52,7 @@ def dataset_resampled(vnm_geoboundaries_admin2, vnm_pop):
 
 
 def test_dataset_properties(dataset):
-    assert dataset.time_col == "valid_time"
+    assert dataset.time_coord == "valid_time"
     # longitude should not be from 180 - 360
     assert float(dataset.dataset.longitude.max()) < 180
     assert dataset.variables == ["tp"]
