@@ -14,6 +14,19 @@ def fmt(session):
     session.install("ruff")
     session.run("ruff", "format", "--check")
 
+@nox.session(default=False)
+def docs(session):
+    "Generate documentation using jupyter-book"
+    session.env.update({"UV_PROJECT_ENVIRONMENT": session.virtualenv.location})
+    session.run("uv", "sync", "--all-extras", "--dev")
+    session.run("uv", "run", "jupyter-book", "build", "docs")
+
+@nox.session(default=False)
+def apidocs(session):
+    "Generate API documentation"
+    session.env.update({"UV_PROJECT_ENVIRONMENT": session.virtualenv.location})
+    session.run("uv", "sync", "--all-extras", "--dev")
+    session.run("uv", "run", "sphinx-apidoc", "-o", "docs/reference", "-H", "Module reference", "src/geoglue")
 
 @nox.session(python="3.10")
 def tests(session):
