@@ -391,18 +391,16 @@ class ReanalysisSingleLevels:
     ):
         self.iso3 = iso3.upper()
         self.geo_backend = geo_backend
-        if (bounds is None) ^ (timezone_offset is None):
-            raise ValueError(
-                "Either none or both of bounds and timezone_offset must be specified"
-            )
-        if bounds and timezone_offset:
+        if bounds is not None and timezone_offset is None:
+            raise ValueError("Timezone offset must be specified with bounds")
+        if bounds:
             self.bounds = bounds
             self.timezone_offset = timezone_offset
         else:
             # use country object to obtain bounds and timezone offset
             country = Country(iso3, backend=geo_backend)
             self.bounds = country.integer_bounds
-            self.timezone_offset = country.timezone_offset
+            self.timezone_offset = timezone_offset or country.timezone_offset
         self.variables = variables
         path = path or data_path / iso3 / "era5"
         if not path.exists():
