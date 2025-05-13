@@ -296,9 +296,13 @@ class MemoryRaster:
         with MemoryFile() as memfile:
             if zfill and np.ma.isMaskedArray(self.data):
                 data = self.data.filled(0)  # type: ignore
+                profile = copy.deepcopy(self.profile)
+                # zfill is set, so we explicitly ignore nodata
+                del profile['nodata']
             else:
                 data = self.data
-            with memfile.open(**self.profile) as dataset:
+                profile = self.profile
+            with memfile.open(**profile) as dataset:
                 dataset.write(np.expand_dims(data, axis=0))
 
             with memfile.open() as dataset:
