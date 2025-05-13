@@ -19,9 +19,13 @@ class Bounds(NamedTuple):
     "Geographic bounds"
 
     north: int | float
+    "Northern bounds"
     west: int | float
+    "Western bounds"
     south: int | float
+    "Southern bounds"
     east: int | float
+    "Eastern bounds"
 
     def __lt__(self, other):
         return (

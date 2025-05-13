@@ -1,7 +1,4 @@
 """
-ERA5 data download and data aggregation
----------------------------------------
-
 This module downloads ERA5 daily level data and provides classes to
 resample and aggregate data to administrative levels obtained from GADM
 """

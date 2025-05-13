@@ -47,11 +47,62 @@ def geoboundaries_shapefile_url(url: str, adm: int) -> str:
 
 
 def get_timezone_offset(tz: pytz.BaseTzInfo, localize_date: datetime.datetime) -> str:
+    """Returns a string representation of a timezone
+
+    Parameters
+    ----------
+    tz : pytz.BaseTzInfo
+        Timezone to return a string representation for
+    localize_date : datetime.datetime
+        Date to which timezone should be localized. See geoglue.country.Country
+        for more information on this parameter
+
+    Returns
+    -------
+    str
+        String representation of timezone, such as +01:00 for Europe/Paris
+    """
     s = tz.localize(localize_date).strftime("%z")
     return s[:3] + ":" + s[3:]
 
 
 class Country:
+    """Constructs a Country class given an ISO3 code
+
+    Parameters
+    ----------
+    iso3 : str
+        ISO 3166-2 3-letter alpha code
+    gadm_version : str
+        If using GADM, GADM version to download, default=4.1
+    crs : str
+        Coordinate Reference System (CRS) to project downloaded geospatial data.
+        Default is EPSG:4326, representing latitude and longitude
+    backend : Backend
+        Backend, must be one of `gadm` or `geoboundaries`
+    localize_date : datetime.datetime
+        Date where timezone is localised to, default=2022-01-01.
+
+        Date used to localize the timezone obtained from pytz. Timezone
+        names (such as Europe/Berlin) do not have a fixed offset due to daylight
+        savings time changes, and the same timezone can have a different offset,
+        usually in summer months. The exact date when DST starts also varies by year
+        according to local policy shifts. We pick a specific date here to ensure that
+        the localization is reproducible. The date is taken to be in the middle of
+        winter in the Northern hemisphere when DST does not apply and the
+        time offset follows standard time. For countries in the Southern hemisphere,
+        the choice of this date may lead to non-standard (daylight savings) time
+        being used.
+    data_path : Path | None
+        Data path to download data, by default ~/.local/share/geoglue
+    timezone : pytz.BaseTzInfo | None
+        Timezone, if not specified will be determined from country ISO3 code. The default
+        mechanism works fine for countries with a unique timezone, but may not
+        select the intended timezone for countries spanning multiple timezones.
+    fetch_data : bool
+        Whether to fetch data on initialisation, default=True. If set to False, data
+        can be fetched later by calling fetch_shapefiles()
+    """
     def __init__(
         self,
         iso3: str,
@@ -63,42 +114,6 @@ class Country:
         timezone: pytz.BaseTzInfo | None = None,
         fetch_data: bool = True,
     ):
-        """Constructs a Country class given an ISO3 code
-
-        Parameters
-        ----------
-        iso3 : str
-            ISO 3166-2 3-letter alpha code
-        gadm_version : str
-            If using GADM, GADM version to download, default=4.1
-        crs : str
-            Coordinate Reference System (CRS) to project downloaded geospatial data.
-            Default is EPSG:4326, representing latitude and longitude
-        backend : Backend
-            Backend, must be one of `gadm` or `geoboundaries`
-        localize_date : datetime.datetime
-            Date where timezone is localised to, default=2022-01-01.
-
-            Date used to localize the timezone obtained from pytz. Timezone
-            names (such as Europe/Berlin) do not have a fixed offset due to daylight
-            savings time changes, and the same timezone can have a different offset,
-            usually in summer months. The exact date when DST starts also varies by year
-            according to local policy shifts. We pick a specific date here to ensure that
-            the localization is reproducible. The date is taken to be in the middle of
-            winter in the Northern hemisphere when DST does not apply and the
-            time offset follows standard time. For countries in the Southern hemisphere,
-            the choice of this date may lead to non-standard (daylight savings) time
-            being used.
-        data_path : Path | None
-            Data path to download data, by default ~/.local/share/geoglue
-        timezone : pytz.BaseTzInfo | None
-            Timezone, if not specified will be determined from country ISO3 code. The default
-            mechanism works fine for countries with a unique timezone, but may not
-            select the intended timezone for countries spanning multiple timezones.
-        fetch_data : bool
-            Whether to fetch data on initialisation, default=True. If set to False, data
-            can be fetched later by calling fetch_shapefiles()
-        """
         self.iso3 = iso3.upper()
         self.version = gadm_version if backend == "gadm" else None
         self.backend: Backend = backend
@@ -208,6 +223,7 @@ class Country:
             raise requests.ConnectionError(f"Failed to download {url=}")
 
     def admin_cols(self, adm: int) -> list[str]:
+        "Returns list of columns corresponding to geographical metadata"
         match self.backend:
             case "gadm":
                 return [f"{c}_{i}" for c in ["GID", "NAME"] for i in range(1, adm + 1)]

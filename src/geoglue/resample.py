@@ -86,7 +86,8 @@ def resampled_dataset(
 
     Yields
     ------
-    Resampled dataset
+    xr.Dataset
+        Resampled dataset
 
     Example
     -------

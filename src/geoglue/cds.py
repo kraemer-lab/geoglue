@@ -96,16 +96,12 @@ def _time_reduce(
 class CdsDataset(NamedTuple):
     """
     Tuple containing instant and accumulated variables from cdsapi
-
-    Members
-    -------
-    instant
-        Instant variables, such as temperature and wind speed
-    accum
-        Accumulated variables, such as total precipitation and surface solar radiation
     """
     instant: xr.Dataset
+    "Instant variables such as temperature and wind speed"
+
     accum: xr.Dataset
+    "Accumulated variables, such as total precipitation and surface solar radiation"
 
     def __eq__(self, other) -> bool:
         return self.instant.equals(other.instant) and self.accum.equals(other.accum)
@@ -154,16 +150,11 @@ class CdsDataset(NamedTuple):
 class CdsPath(NamedTuple):
     """
     Tuple containing paths to instant and accumulated variables from cdsapi
-
-    Members
-    -------
-    instant
-        Path to instant variable dataset
-    accum
-        Path to accumulated variable dataset
     """
     instant: Path | None
+    "Path to instant variable dataset"
     accum: Path | None
+    "Path to accumulated variable dataset"
 
     def as_dataset(self, drop_vars: list[str] = DROP_VARS) -> CdsDataset:
         """
@@ -173,6 +164,11 @@ class CdsPath(NamedTuple):
         ----------
         drop_vars
             Variables to drop, default=['number', 'expver', 'surface']
+
+        Returns
+        -------
+        CdsDataset
+            Dataset corresponding to CdsPath
         """
         instant = xr.open_dataset(self.instant)
         accum = xr.open_dataset(self.accum)
@@ -369,15 +365,36 @@ def grib_to_netcdf(file: Path, path: Path) -> CdsPath:
 class ReanalysisSingleLevels:
     """Fetch ERA5 reanalysis data from cdsapi for a particular country
 
-    Attributes
+    Parameters
     ----------
-    iso3 : ISO 3166-2 3-letter country code
-    geo_backend : One of `gadm` or `geoboundaries`. Default is `gadm`
-    variables : List of variables to fetch
-    path : Data path to download data to
-    stub : Stub to use in filename, defau/n=`era5`. This is used as part of the downloaded filename, e.g. VNM-2020-stub.accum.nc
-    data_format : Data format to download files in, one of `grib` or `netcdf`, default=`grib`
+    iso3 : str
+        ISO 3166-2 3-letter country code
+    geo_backend : Literal['gadm', 'geoboundaries']
+        One of `gadm` or `geoboundaries`. Default is `gadm`
+    variables : list[str]
+        List of variables to fetch
+    path : Path | None
+        Data path to download data to, optional. If not specified, downloads
+        data to the default path, ``~/.local/share/geoglue``.
+    stub : str
+        Stub to use in filename, default=`era5`. This is used as part of the
+        downloaded filename, e.g. ``VNM-2020-stub.accum.nc``
+    data_format : Literal['grib', 'netcdf']
+        Data format to download files in, one of `grib` or `netcdf`, default=`grib`.
+        Downloading data in GRIB format allows downloading more variables. GRIB
+        files are converted to netCDF, so both options result in identical data files.
+    bounds: Bounds | None
+        Spatial bounds to request data from ECMWF's cdsapi service, optional.
+        If not specified, calculated from country shapefile bounds
+    timezone_offset: str | None
+        Timezone offset in the form +HH:00 or -HH:00, optional. If not specified,
+        calculated from country information.
+
+        .. warning:: For countries spanning multiple timezones, automatic timezone offset
+           selection may select an incorrect choice. We recommend setting this parameter explicitly
+           for these cases.
     """
+
     def __init__(
         self,
         iso3: str,

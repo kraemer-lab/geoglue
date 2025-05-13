@@ -21,12 +21,12 @@ overlap with a zonal polygon.
 
 geoglue has several modules:
 
-- `geoglue.cds`: Methods to work with data downloaded from ECMWF's [cdsapi](https://cds.climate.copernicus.eu/how-to-api)
-- `geoglue.country`: Fetch geospatial boundaries data from
+- {mod}`geoglue.cds`: Methods to work with data downloaded from ECMWF's [cdsapi](https://cds.climate.copernicus.eu/how-to-api)
+- {mod}`geoglue.country`: Fetch geospatial boundaries data from
   [GADM](https://gadm.org) or [geoBoundaries](https://www.geoboundaries.org)
-- `geoglue.memoryraster`: Read and work with GeoTIFF datasets in memory.
-- `geoglue.resample`: Resample data using the
+- {mod}`geoglue.memoryraster`: Read and work with GeoTIFF datasets in memory.
+- {mod}`geoglue.resample`: Resample data using the
   [Climate Data Operators](https://code.mpimet.mpg.de/projects/cdo) library.
-- `geoglue.zonal_stats`: Perform zonal statistics on climate data, such
+- {mod}`geoglue.zonal_stats`: Perform zonal statistics on climate data, such
   as those downloaded from cdsapi via the `geoglue.cds` module
 

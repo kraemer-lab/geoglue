@@ -53,17 +53,29 @@ def get_numpy_dtype(t: str):
 
 @dataclasses.dataclass
 class MemoryRaster:
-    """Class to operate on rasters in-memory
+    """Class to operate on rasters in-memory.
 
-    Attributes
+    While MemoryRaster can be constructed directly by passing the parameters
+    below, in normal practice, it is constructed by reading from a GeoTIFF file
+    or xarray object, using :meth:`read()` or :meth:`from_xarray()`.
+
+    Parameters
     ----------
-    data : Data to consider as raster
-    transform : Affine transformation associated with raster
-    crs : Coordinate reference system associated with raster
-    nodata : Data value indicating NA
-    origin_path : Path to source file
-    dtype : numpy dtype of array
-    driver : rasterio driver, optional, default='GTiff'
+    data : np.ndarray
+        Data to consider as raster
+    transform : affine.Affine
+        Affine transformation associated with raster
+    crs : str | pyproj.crs.CRS | None
+        Coordinate reference system associated with raster
+    nodata : int | float
+        Data value indicating NA
+    origin_path : Path | None
+        Path to source file, optional, default=None.
+        This attribute is populated if the MemoryRaster is read from a file
+    dtype : str
+        numpy dtype of array, default='float64'
+    driver : str
+        rasterio driver, optional, default='GTiff'
     """
     data: np.ndarray | np.ma.MaskedArray | xr.DataArray
     transform: affine.Affine
@@ -368,10 +380,10 @@ class MemoryRaster:
     ) -> MemoryRaster:
         """Resamples source raster to match destination mask
 
-        ..note:: This function is meant to be used for resampling MemoryRaster,
-                 usually those created from GeoTIFF files. For data already in
-                 netCDF format, we recommend using Climate Data Operator (cdo)'s
-                 resampling functions, for which we provide a wrapper.
+        This function is meant to be used for resampling MemoryRaster, usually
+        those created from GeoTIFF files. For data already in netCDF format, we
+        recommend using Climate Data Operator (cdo)'s resampling functions, for
+        which we provide a wrapper in :mod:`geoglue.resample`
 
         Parameters
         ----------
