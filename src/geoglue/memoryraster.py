@@ -431,7 +431,7 @@ class MemoryRaster:
             the zonal statistics requested. Each separate zonal statistic is
             given a column in the data
         """
-        with self.as_rasterio() as raster:
+        with self.as_rasterio(zfill=True) as raster:
             if weights:
                 with weights.as_rasterio(zfill=True) as weights_raster:
                     out = exactextract.exact_extract(
