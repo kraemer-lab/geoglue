@@ -14,6 +14,36 @@ import numpy as np
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
 
 
+def crop_dataset_to_geometry(ds: xr.Dataset, geom: gpd.GeoDataFrame) -> xr.Dataset:
+    """Crop xarray dataset to geometry
+
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Dataset to crop
+    geom : gpd.GeoDataFrame
+        Geometry to crop
+
+    Returns
+    -------
+    xr.Dataset
+        Cropped dataset
+    """
+    extent_long, extent_lat = get_extents(geom)
+    ds = ds.sel(longitude=extent_long, latitude=extent_lat)
+    set_lonlat_attrs(ds)  # makes dataset cdo compatible
+    return ds
+
+
+def sort_lonlat(ds: xr.Dataset) -> xr.Dataset:
+    "Sorts longitude to -180 - 180 and latitude in descending order"
+    if float(ds.coords["longitude"].max()) > 180:
+        ds.coords["longitude"] = (ds.coords["longitude"] + 180) % 360 - 180
+        ds = ds.sortby(ds.longitude)
+    ds = ds.sortby(ds.latitude, ascending=False)
+    return ds
+
+
 def set_lonlat_attrs(ds: xr.Dataset):
     """Sets CF-compliant grid attributes
 
@@ -50,7 +80,7 @@ def set_lonlat_attrs(ds: xr.Dataset):
     )
 
 
-def find_time_coords(ds: xr.Dataset) -> list[str]:
+def find_time_coords(ds: xr.Dataset | xr.DataArray) -> list[str]:
     "Lists all time coordinates (dtype `np.datetime64`)"
     time_coords = []
     for coord in ds.coords:
@@ -65,7 +95,7 @@ def find_time_coords(ds: xr.Dataset) -> list[str]:
     return time_coords
 
 
-def find_unique_time_coord(ds: xr.Dataset) -> str:
+def find_unique_time_coord(ds: xr.Dataset | xr.DataArray) -> str:
     "Finds unique time coordinate or raises a ValueError"
     coords = find_time_coords(ds)
     match len(coords):
