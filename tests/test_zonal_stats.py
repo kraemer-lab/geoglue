@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 import xarray as xr
 from geoglue.zonal_stats import DatasetZonalStatistics
-from geoglue.country import Country
+from geoglue.region import geoboundaries, get_worldpop_1km, read_region
 from geoglue.resample import resample
 
 DATA_PATH = Path("data")
@@ -14,8 +14,8 @@ ADMIN2_N = 706
 
 @pytest.fixture(scope="module")
 def vnm_geoboundaries_admin2():
-    cc = Country("VNM", backend="geoboundaries", data_path=DATA_PATH)
-    df = cc.admin(2)
+    df = read_region(geoboundaries("VNM", 2, data_path=DATA_PATH))
+    print("COLUMNS", df.columns)
 
     # We use era5_extents which use admin0 boundaries. In geoBoundaries data,
     # the admin0 total_bounds are smaller than the admin2 total bounds which
@@ -27,7 +27,7 @@ def vnm_geoboundaries_admin2():
 
 @pytest.fixture(scope="module")
 def vnm_pop():
-    return Country("VNM").population_raster(2020)
+    return get_worldpop_1km("VNM", 2020)
 
 
 @pytest.fixture(scope="module")
@@ -45,10 +45,11 @@ def dataset_unweighted(vnm_geoboundaries_admin2):
 @pytest.fixture(scope="module")
 def dataset_resampled(vnm_geoboundaries_admin2, vnm_pop):
     outfile = PRECIP_DATA.parent / (PRECIP_DATA.stem + "_remapdis.nc")
-    if not outfile.exists():
-        resample("remapdis", PRECIP_DATA, vnm_pop, outfile)
+    resample("remapdis", PRECIP_DATA, vnm_pop, outfile)
     ds = xr.open_dataset(outfile)
-    return DatasetZonalStatistics(ds, vnm_geoboundaries_admin2, vnm_pop)
+    yield DatasetZonalStatistics(ds, vnm_geoboundaries_admin2, vnm_pop)
+    if outfile.exists():
+        outfile.unlink()
 
 
 def test_dataset_properties(dataset):

@@ -18,8 +18,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .country import Country
-from .types import Bounds
+from .region import Region
 from .util import find_unique_time_coord
 from . import data_path
 
@@ -97,6 +96,7 @@ class CdsDataset(NamedTuple):
     """
     Tuple containing instant and accumulated variables from cdsapi
     """
+
     instant: xr.Dataset
     "Instant variables such as temperature and wind speed"
 
@@ -151,6 +151,7 @@ class CdsPath(NamedTuple):
     """
     Tuple containing paths to instant and accumulated variables from cdsapi
     """
+
     instant: Path | None
     "Path to instant variable dataset"
     accum: Path | None
@@ -175,7 +176,8 @@ class CdsPath(NamedTuple):
         to_drop_instant = set(instant.coords) & set(drop_vars)
         to_drop_accum = set(accum.coords) & set(drop_vars)
         return CdsDataset(
-            instant=instant.drop_vars(to_drop_instant), accum=accum.drop_vars(to_drop_accum)
+            instant=instant.drop_vars(to_drop_instant),
+            accum=accum.drop_vars(to_drop_accum),
         )
 
     def exists(self) -> bool:
@@ -191,7 +193,7 @@ def timeshift_hours(
     ds2: xr.Dataset,
     shift: int,
     dim: str = "valid_time",
-    ) -> xr.Dataset:
+) -> xr.Dataset:
     """Timeshift dataset by ``shift`` hours.
 
     If ``shift`` is a positive integer (longitude east), then that many hours
@@ -367,10 +369,8 @@ class ReanalysisSingleLevels:
 
     Parameters
     ----------
-    iso3 : str
-        ISO 3166-2 3-letter country code
-    geo_backend : Literal['gadm', 'geoboundaries']
-        One of `gadm` or `geoboundaries`. Default is `gadm`
+    region: Region
+        Region for which to download data
     variables : list[str]
         List of variables to fetch
     path : Path | None
@@ -378,49 +378,39 @@ class ReanalysisSingleLevels:
         data to the default path, ``~/.local/share/geoglue``.
     stub : str
         Stub to use in filename, default=`era5`. This is used as part of the
-        downloaded filename, e.g. ``VNM-2020-stub.accum.nc``
+        downloaded filename, e.g. ``VNM-2-2020-stub.accum.nc``
     data_format : Literal['grib', 'netcdf']
         Data format to download files in, one of `grib` or `netcdf`, default=`grib`.
         Downloading data in GRIB format allows downloading more variables. GRIB
         files are converted to netCDF, so both options result in identical data files.
-    bounds: Bounds | None
-        Spatial bounds to request data from ECMWF's cdsapi service, optional.
-        If not specified, calculated from country shapefile bounds
-    timezone_offset: str | None
-        Timezone offset in the form +HH:00 or -HH:00, optional. If not specified,
-        calculated from country information.
-
-        .. warning:: For countries spanning multiple timezones, automatic timezone offset
-           selection may select an incorrect choice. We recommend setting this parameter explicitly
-           for these cases.
+    admin_in_name : bool
+        Whether to keep administrative level in the downloaded name, optional, default=False.
+        This can be useful for jurisdictions where the bounds for administrative
+        levels differ, and the request to cdsapi thus differs. By default, the
+        admin level (e.g. ``-2`` in ``VNM-2``) is removed from the final output file.
     """
 
     def __init__(
         self,
-        iso3: str,
+        region: Region,
         variables: list[str],
-        geo_backend: Literal["gadm", "geoboundaries"] = "gadm",
         path: Path | None = None,
         stub: str = "era5",
         data_format: Literal["grib", "netcdf"] = "grib",
-        bounds: Bounds | None = None,
-        timezone_offset: str | None = None,
+        admin_in_name: bool = False,
     ):
-        self.iso3 = iso3.upper()
-        self.geo_backend = geo_backend
-        if bounds is not None and timezone_offset is None:
-            raise ValueError("Timezone offset must be specified with bounds")
-        if bounds:
-            self.bounds = bounds
-            self.timezone_offset = timezone_offset
-        else:
-            # use country object to obtain bounds and timezone offset
-            country = Country(iso3, backend=geo_backend)
-            self.bounds = country.integer_bounds
-            self.timezone_offset = timezone_offset or country.timezone_offset
+        self.region = region
+        self.bounds = region["bounds"].as_int()
+        self.timezone_offset = region["tz"]
         self.variables = variables
-        path = path or data_path / iso3 / "era5"
-        if not path.exists():
+
+        # Keep part before admin for name
+        # This assumes that the boundaries for a particular name prefix
+        # are same across administrative levels
+        self.name = region["name"] if admin_in_name else region["name"].split("-")[0]
+        self.name_without_admin = region["name"].split("-")[0]
+        self.name = region["name"] if admin_in_name else self.name_without_admin
+        if not (path := path or data_path / self.name_without_admin / "era5").exists():
             path.mkdir(parents=True)
         self.path = path
         self.stub = stub
@@ -428,7 +418,7 @@ class ReanalysisSingleLevels:
 
     def __repr__(self):
         return (
-            f"ReanalysisSingleLevels({self.iso3!r}, {self.variables!r}, geo_backend={self.geo_backend!r}, "
+            f"ReanalysisSingleLevels({self.region!r}, {self.variables!r}, "
             f"path={self.path!r}, stub={self.stub!r}, data_format={self.data_format!r})"
         )
 
@@ -471,9 +461,9 @@ class ReanalysisSingleLevels:
             Path of netCDF file that was written to disk
         """
         suffix = "grib" if self.data_format == "grib" else "zip"
-        outfile = self.path / f"{self.iso3}-{year}-{self.stub}.{suffix}"
-        accum_file = self.path / f"{self.iso3}-{year}-{self.stub}.accum.nc"
-        instant_file = self.path / f"{self.iso3}-{year}-{self.stub}.instant.nc"
+        outfile = self.path / f"{self.name}-{year}-{self.stub}.{suffix}"
+        accum_file = self.path / f"{self.name}-{year}-{self.stub}.accum.nc"
+        instant_file = self.path / f"{self.name}-{year}-{self.stub}.instant.nc"
         if accum_file.exists() and instant_file.exists():
             return CdsPath(instant=instant_file, accum=accum_file)
 
@@ -499,12 +489,13 @@ class ReanalysisSingleLevels:
                 f"Can't perform timeshift for fractional timezone offset: {self.timezone_offset}"
             )
         return DatasetPool(
-            self.path.glob(f"{self.iso3}-????-{self.stub}.*.nc"), shift_hours=hours
+            self.path.glob(f"{self.name}-????-{self.stub}.*.nc"), shift_hours=hours
         )
 
 
 class DatasetPool:
     "Collection of ERA5 reanalysis data"
+
     def __init__(self, paths: Iterable[Path], shift_hours: int = 0):
         """Instantiates a pool of yearly downloaded data that allows time-shifting
 
@@ -524,7 +515,9 @@ class DatasetPool:
         match_groups = [m.groups() for m in matches if m]
         parents = set(p.parent for p in self.paths)
         if len(parents) != 1:
-            raise ValueError(f"All files in DatasetPool must be in same folder, found multiple parent folders: {parents}")
+            raise ValueError(
+                f"All files in DatasetPool must be in same folder, found multiple parent folders: {parents}"
+            )
         self.folder = self.paths[0].parent
         iso3 = set(map(operator.itemgetter(0), match_groups))
         stubs = set(map(operator.itemgetter(2), match_groups))

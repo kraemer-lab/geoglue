@@ -43,7 +43,7 @@ class Bounds(NamedTuple):
             and self.east >= other.east
         )
 
-    def integer_bounds(self) -> Bounds:
+    def as_int(self) -> Bounds:
         north = self.north if isinstance(self.north, int) else math.ceil(self.north)
         west = self.west if isinstance(self.west, int) else math.floor(self.west)
         south = self.south if isinstance(self.south, int) else math.floor(self.south)
