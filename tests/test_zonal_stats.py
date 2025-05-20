@@ -1,11 +1,11 @@
-import datetime
 from pathlib import Path
 
 import pytest
 import xarray as xr
-from geoglue.zonal_stats import DatasetZonalStatistics
+from geoglue.zonal_stats import zonal_stats, zonal_stats_xarray
 from geoglue.region import geoboundaries, get_worldpop_1km, read_region
 from geoglue.resample import resample
+from geoglue.util import sort_lonlat, find_unique_time_coord
 
 DATA_PATH = Path("data")
 PRECIP_DATA = DATA_PATH / "VNM" / "era5" / "VNM-2020-era5.daily_sum.nc"
@@ -15,7 +15,6 @@ ADMIN2_N = 706
 @pytest.fixture(scope="module")
 def vnm_geoboundaries_admin2():
     df = read_region(geoboundaries("VNM", 2, data_path=DATA_PATH))
-    print("COLUMNS", df.columns)
 
     # We use era5_extents which use admin0 boundaries. In geoBoundaries data,
     # the admin0 total_bounds are smaller than the admin2 total bounds which
@@ -27,58 +26,72 @@ def vnm_geoboundaries_admin2():
 
 @pytest.fixture(scope="module")
 def vnm_pop():
-    return get_worldpop_1km("VNM", 2020)
+    return get_worldpop_1km("VNM", 2020, data_path=DATA_PATH)
 
 
 @pytest.fixture(scope="module")
-def dataset(vnm_geoboundaries_admin2, vnm_pop):
-    ds = xr.open_dataset(PRECIP_DATA)
-    return DatasetZonalStatistics(ds, vnm_geoboundaries_admin2, vnm_pop)
+def dataset():
+    ds = sort_lonlat(xr.open_dataset(PRECIP_DATA))
+    return ds
 
 
 @pytest.fixture(scope="module")
-def dataset_unweighted(vnm_geoboundaries_admin2):
-    ds = xr.open_dataset(PRECIP_DATA)
-    return DatasetZonalStatistics(ds, vnm_geoboundaries_admin2)
-
-
-@pytest.fixture(scope="module")
-def dataset_resampled(vnm_geoboundaries_admin2, vnm_pop):
+def dataset_resampled(vnm_pop):
     outfile = PRECIP_DATA.parent / (PRECIP_DATA.stem + "_remapdis.nc")
     resample("remapdis", PRECIP_DATA, vnm_pop, outfile)
     ds = xr.open_dataset(outfile)
-    yield DatasetZonalStatistics(ds, vnm_geoboundaries_admin2, vnm_pop)
+    yield ds
     if outfile.exists():
         outfile.unlink()
 
 
 def test_dataset_properties(dataset):
-    assert dataset.time_coord == "valid_time"
+    assert find_unique_time_coord(dataset) == "valid_time"
     # longitude should not be from 180 - 360
-    assert float(dataset.dataset.longitude.max()) < 180
-    assert dataset.variables == ["tp"]
+    assert float(dataset.longitude.max()) < 180
+    assert "tp" in dataset.variables
 
 
-def test_zonal_stats_raises_error(dataset):
-    d = datetime.date(2020, 1, 1)
+def test_zonal_stats_raises_error(dataset, vnm_geoboundaries_admin2, vnm_pop):
+    da = dataset.tp.sel(valid_time=slice("2020-01-01", "2020-01-01"))
     with pytest.raises(ValueError, match="Variable shape"):
-        dataset.zonal_stats("tp", "sum", min_date=d, max_date=d)
+        zonal_stats(da, vnm_geoboundaries_admin2, "sum", weights=vnm_pop)
 
 
 @pytest.mark.parametrize(
-    "ds,ops,int_value_max",
+    "op,int_value_max",
     [
-        ("dataset_resampled", "sum", 2274),
-        ("dataset_resampled", "area_weighted_sum", 45),
-        ("dataset_unweighted", "sum", 0),
+        ("sum", 2274),
+        ("area_weighted_sum", 45),
     ],
 )
-def test_zonal_stats(ds, ops, int_value_max, request):
-    ds = request.getfixturevalue(ds)
-    d = datetime.date(2020, 1, 1)
-    df = ds.zonal_stats("tp", ops, min_date=d, max_date=d)
+def test_zonal_stats(
+    dataset_resampled, vnm_geoboundaries_admin2, vnm_pop, op, int_value_max
+):
+    da = dataset_resampled.tp.sel(valid_time=slice("2020-01-01", "2020-01-01"))
+    df = zonal_stats(da, vnm_geoboundaries_admin2, op, weights=vnm_pop)
     assert len(df) == ADMIN2_N
     assert (df.value >= 0).all()  # non-negative values
     assert int(df.value.max()) == int_value_max
-    if ops == "area_weighted_sum":
+    if op == "area_weighted_sum":
         assert "weighted_sum" in df.columns and "count" in df.columns
+
+
+@pytest.mark.parametrize(
+    "op,int_value_max",
+    [
+        ("sum", 2274),
+        ("area_weighted_sum", 45),
+    ],
+)
+def test_zonal_stats_xarray(
+    dataset_resampled, vnm_geoboundaries_admin2, vnm_pop, op, int_value_max
+):
+    da = dataset_resampled.tp.sel(valid_time=slice("2020-01-01", "2020-01-01"))
+    za = zonal_stats_xarray(
+        da, vnm_geoboundaries_admin2, op, weights=vnm_pop, region_col="shapeID"
+    )
+    print(za)
+    assert len(za.region) == ADMIN2_N
+    assert (za >= 0).all()  # non-negative values
+    assert int(za.max()) == int_value_max
