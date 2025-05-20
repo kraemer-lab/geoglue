@@ -92,9 +92,8 @@ def resampled_dataset(
     Example
     -------
     >>> from geoglue.resample import resampled_dataset
-    >>> from geoglue.country import Country
-    >>> country = Country('ABC')
-    >>> with resampled_dataset("remapbil", "somefile.nc", country.population_raster(2020)) as ds:
+    >>> from geoglue.region import get_worldpop_1km
+    >>> with resampled_dataset("remapbil", "somefile.nc", get_worldpop_1km('ABC', 2020)) as ds:
     ...     print(ds)
     """
     if isinstance(data, xr.Dataset):

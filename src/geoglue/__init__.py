@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from .memoryraster import MemoryRaster
-from .country import Country
+from .region import Region
 
 if data_home := os.getenv("XDG_DATA_HOME"):
     data_path = Path(data_home) / "geoglue"
@@ -11,4 +11,4 @@ else:
 if not data_path.exists():
     data_path.mkdir(parents = True)
 
-__all__ = ["MemoryRaster", "Country"]
+__all__ = ["MemoryRaster", "Region"]

@@ -16,13 +16,34 @@ from geoglue.cds import (
     grib_to_netcdf,
     get_first_monday,
 )
+from geoglue.region import Region
 from geoglue.types import Bounds
 
-BOUNDS = {
-    "BRB": Bounds(north=14, west=-59, south=13, east=-58),
-    "SGP": Bounds(north=2, west=103, south=1, east=105),
+BRB: Region = {
+    "name": "BRB-1",
+    "path": "/path/to/BRB.shp",
+    "pk": "GID_1",
+    "tz": "-04:00",
+    "url": "https://gadm.org",
+    "bounds": Bounds(north=14, west=-59, south=13, east=-58),
 }
-TIMEZONES = {"BRB": "-04:00", "SGP": "+08:00"}
+
+SGP: Region = {
+    "name": "SGP-1",
+    "path": "/path/to/SGP.shp",
+    "pk": "GID_1",
+    "tz": "+08:00",
+    "url": "https://gadm.org",
+    "bounds": Bounds(north=2, west=103, south=1, east=105),
+}
+NPL: Region = {
+    "name": "NPL-1",
+    "path": "/path/to/NPL.shp",
+    "pk": "GID_1",
+    "tz": "+05:45",
+    "url": "https://gadm.org",
+    "bounds": Bounds(west=80.0884245137, south=26.3978980576, east=88.1748043151, north=30.4227169866)
+}
 
 
 # fmt: off
@@ -82,24 +103,20 @@ def test_get_timezone_offset_hours(offset, hours):
 @pytest.fixture(scope="module")
 def data_singapore():
     return ReanalysisSingleLevels(
-        "SGP",
+        SGP,
         VARIABLES,
         path=Path("tests/data"),
         data_format="netcdf",
-        bounds=BOUNDS["SGP"],
-        timezone_offset=TIMEZONES["SGP"],
     )
 
 
 @pytest.fixture(scope="module")
 def data_barbados():
     return ReanalysisSingleLevels(
-        "BRB",
+        BRB,
         VARIABLES,
         path=Path("tests/data"),
         data_format="netcdf",
-        bounds=BOUNDS["BRB"],
-        timezone_offset=TIMEZONES["BRB"],
     )
 
 
@@ -131,11 +148,9 @@ def test_get_when_file_exists(mock_client, data_singapore):
 @patch("cdsapi.Client", autospec=True)
 def test_get_netcdf(mock_client):
     ReanalysisSingleLevels(
-        "SGP",
+        SGP,
         VARIABLES,
         data_format="netcdf",
-        bounds=BOUNDS["SGP"],
-        timezone_offset=TIMEZONES["SGP"],
     ).get(2020)
     mock_client().retrieve.assert_called_once_with(
         "reanalysis-era5-single-levels",
@@ -147,11 +162,9 @@ def test_get_netcdf(mock_client):
 @patch("cdsapi.Client", autospec=True)
 def test_get_grib(mock_client):
     ReanalysisSingleLevels(
-        "SGP",
+        SGP,
         VARIABLES,
         data_format="grib",
-        bounds=BOUNDS["SGP"],
-        timezone_offset=TIMEZONES["SGP"],
     ).get(2020)
     mock_client().retrieve.assert_called_once_with(
         "reanalysis-era5-single-levels",
@@ -227,7 +240,7 @@ def test_era5_extract_hourly_data_raises_error():
 
 
 def test_fractional_offset_raises_error():
-    cc = ReanalysisSingleLevels("NPL", VARIABLES)
+    cc = ReanalysisSingleLevels(NPL, VARIABLES)
     with pytest.raises(
         ValueError, match="Can't perform timeshift for fractional timezone offset"
     ):
