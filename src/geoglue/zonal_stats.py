@@ -162,9 +162,8 @@ def zonal_stats_xarray(
 
     Returns
     -------
-    pd.DataFrame
-        The DataFrame specified by the `geom` parameter, one additional column,
-        `value` containing the zonal statistic for the corresponding geometry.
+    xr.DataArray
+        DataArray with `region` and `date` as coordinates
 
     See Also
     --------
@@ -193,7 +192,6 @@ def zonal_stats_xarray(
     pivoted = df[["region", "date", "value"]].pivot(
         index="date", columns="region", values="value"
     )
-    print(pivoted)
     da = xr.DataArray(
         data=pivoted.values,
         coords={"date": pivoted.index, "region": pivoted.columns},
