@@ -5,6 +5,7 @@ to make work with arbitrary shapefiles easier. It also supports
 calculating extents or geospatial bounds, and calculating timezone offsets.
 """
 
+import shlex
 import logging
 import datetime
 from functools import cache
@@ -36,7 +37,7 @@ class Region(TypedDict):
     "Dictionary representing a geospatial region"
 
     name: str
-    "Human readable name"
+    "Region identifier without spaces"
 
     path: str | Path
     "Path to shapefile"
@@ -52,6 +53,37 @@ class Region(TypedDict):
 
     bbox: Bbox
     "Geospatial bounding box"
+
+
+def region_to_string(r: Region) -> str:
+    return " ".join(
+        [
+            r["name"],
+            str(r["bbox"]),
+            shlex.quote(r["pk"]),
+            r["tz"],
+            shlex.quote(str(r["path"])),
+            r.get("url", "http://unknown"),
+        ]
+    )
+
+
+def region_from_string(s: str) -> Region:
+    vals = shlex.split(s)
+    name = vals.pop(0)
+    bbox = Bbox.from_string(vals.pop(0))
+    pk = vals.pop(0)
+    tz = vals.pop(0)
+    path = vals.pop(0)
+    url = vals.pop(0) if vals else "http://unknown"
+    return {
+        "name": name,
+        "path": Path(path),
+        "pk": pk,
+        "tz": tz,
+        "url": url,
+        "bbox": bbox,
+    }
 
 
 def read_region(r: Region) -> gpd.GeoDataFrame:

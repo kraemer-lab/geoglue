@@ -11,10 +11,37 @@ from geoglue.region import (
     get_timezone,
     get_worldpop_1km,
     read_region,
+    region_to_string,
+    region_from_string,
+    Region,
 )
 from geoglue.types import Bbox
 
 DATA_PATH = Path("data")
+
+EXAMPLE_REGION: Region = {
+    "path": Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp"),
+    "name": "geoboundaries:VNM-2",
+    "tz": "+07:00",
+    "pk": "shapeID",
+    "url": "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
+    "bbox": Bbox(
+        maxy=24,
+        minx=102,
+        miny=7,
+        maxx=118,
+    ),
+}
+
+EXAMPLE_REGION_STRING = "geoboundaries:VNM-2 102,7,118,24 shapeID +07:00 data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp https://www.geoboundaries.org/api/current/gbOpen/VNM/"
+
+
+def test_region_to_string():
+    assert region_to_string(EXAMPLE_REGION) == EXAMPLE_REGION_STRING
+
+
+def test_region_from_string():
+    assert region_from_string(EXAMPLE_REGION_STRING) == EXAMPLE_REGION
 
 
 @pytest.fixture(scope="module")
