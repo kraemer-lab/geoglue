@@ -37,6 +37,7 @@ from rasterio.io import MemoryFile
 from rasterio.warp import calculate_default_transform, reproject
 
 from .types import CdoGriddes
+from .util import sha256
 
 DEFAULT_COLORMAP = "viridis"
 
@@ -183,6 +184,10 @@ class MemoryRaster:
             f"NODATA={self.nodata} file={self.origin_path!r}\n"
             f"  transform={self.transform}>"
         )
+
+    def checksum(self) -> str:
+        h = sha256(self.origin_path, prefix=True) if self.origin_path else "<hash:unknown>"
+        return f"MemoryRaster.origin_path={h} {self.origin_path} {self.width}x{self.height}"
 
     @staticmethod
     def from_xarray(
@@ -350,6 +355,7 @@ class MemoryRaster:
                     transform,
                     self.crs,
                     self.nodata,
+                    self.origin_path
                 )
 
     def plot(self, cmap: str = DEFAULT_COLORMAP, fill_nodata=None, **kwargs):

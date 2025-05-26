@@ -20,6 +20,13 @@ def aedes(adm2_polygons):
     )
 
 
+def test_aedes_checksum(aedes):
+    assert (
+        aedes.checksum()
+        == "MemoryRaster.origin_path=sha256:64f38840ad4d349fb36f79ae699bfa9a339769c188797a6ff8ec0a7ac2a5a24d data/aegypti.tif 378x390"
+    )
+
+
 @pytest.fixture(scope="module")
 def population_lowres(population_1km, adm2_polygons):
     aedes = MemoryRaster.read(
