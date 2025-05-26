@@ -400,7 +400,7 @@ class ReanalysisSingleLevels:
         admin_in_name: bool = False,
     ):
         self.region = region
-        self.bounds = region["bounds"].as_int()
+        self.bbox = region["bbox"].int()
         self.timezone_offset = region["tz"]
         self.variables = variables
 
@@ -439,7 +439,7 @@ class ReanalysisSingleLevels:
             "time": TIMES,
             "data_format": self.data_format,
             "download_format": download_format,
-            "area": list(self.bounds),  # type: ignore
+            "area": self.bbox.to_list("cdsapi"),  # type: ignore
         }
 
     def get(self, year: int, skip_exists: bool = True) -> CdsPath | None:

@@ -20,7 +20,7 @@ import geoglue
 
 from .memoryraster import MemoryRaster
 from .util import download_file
-from .types import Bounds
+from .types import Bbox
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class Region(TypedDict):
     url: str
     "URL from which data was downloaded"
 
-    bounds: Bounds
+    bbox: Bbox
     "Geospatial bounding box"
 
 
@@ -108,13 +108,10 @@ def _geoboundaries_shapefile_url(url: str, adm: int) -> str:
     return r.json()["staticDownloadLink"]
 
 
-def get_bounds(path: str | Path) -> Bounds:
-    "Gets bounds of a region"
+def get_bbox(path: str | Path) -> Bbox:
+    "Gets bounding box of a shapefile"
     data = gpd.read_file(path)
-    minx, miny, maxx, maxy = data.total_bounds
-    return Bounds(
-        north=float(maxy), west=float(minx), south=float(miny), east=float(maxx)
-    )
+    return Bbox(*data.total_bounds)
 
 
 def gadm(
@@ -165,7 +162,9 @@ def gadm(
     if not all(f.exists() for f in manifest):
         logging.info("Missing GADM data for %s, downloading data", iso3)
         if not download_file(url, path_geodata / url.split("/")[-1]):
-            raise ConnectionError("GADM data download failed")
+            raise ConnectionError(
+                "GADM data download failed %s -> %s", url, path_geodata
+            )
         logging.info("GADM data downloaded to %s", path_geodata)
     path = path_geodata / f"gadm41_{iso3}_{admin}.shp"
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
@@ -176,7 +175,7 @@ def gadm(
         "pk": f"GID_{admin}",
         "tz": tzoffset,
         "url": url,
-        "bounds": get_bounds(path),
+        "bbox": get_bbox(path),
     }
 
 
@@ -229,7 +228,10 @@ def geoboundaries(
         if not download_file(
             _geoboundaries_shapefile_url(url, adm=admin), path_geodata
         ):
-            raise ConnectionError("geoBoundaries data download failed")
+            raise ConnectionError(
+                "geoBoundaries data download failed %s -> %s",
+                _geoboundaries_shapefile_url(url, adm=admin),
+            )
         logging.info("geoBoundaries data downloaded to %s", path_geodata)
     path = path_geodata / f"geoBoundaries-{iso3}-ADM{admin}.shp"
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
@@ -240,7 +242,7 @@ def geoboundaries(
         "pk": "shapeID",
         "tz": tzoffset,
         "url": url,
-        "bounds": get_bounds(path),
+        "bbox": get_bbox(path),
     }
 
 

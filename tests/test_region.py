@@ -12,7 +12,7 @@ from geoglue.region import (
     get_worldpop_1km,
     read_region,
 )
-from geoglue.types import Bounds
+from geoglue.types import Bbox
 
 DATA_PATH = Path("data")
 
@@ -35,11 +35,11 @@ def test_region_geoboundaries(region_geoboundaries):
         "tz": "+07:00",
         "pk": "shapeID",
         "url": "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
-        "bounds": Bounds(
-            north=23.392205570000044,
-            west=102.14402486200004,
-            south=7.180931477000058,
-            east=117.83545743800005,
+        "bbox": Bbox(
+            maxy=23.392205570000044,
+            minx=102.14402486200004,
+            miny=7.180931477000058,
+            maxx=117.83545743800005,
         ),
     }
 
@@ -51,11 +51,11 @@ def test_region_gadm(region_gadm):
         "tz": "+07:00",
         "pk": "GID_2",
         "url": "https://geodata.ucdavis.edu/gadm/gadm4.1/shp/gadm41_VNM_shp.zip",
-        "bounds": Bounds(
-            north=23.39269256700004,
-            west=102.14458465500007,
-            south=8.381355000000099,
-            east=109.46917000000008,
+        "bbox": Bbox(
+            maxy=23.39269256700004,
+            minx=102.14458465500007,
+            miny=8.381355000000099,
+            maxx=109.46917000000008,
         ),
     }
 
@@ -90,7 +90,7 @@ def test_read_shapefiles(region_geoboundaries):
 
 
 def test_bounds(region_geoboundaries):
-    expected_bounds = np.array([23.39220557, 102.14402486, 7.18093148, 117.83545744])
-    actual_bounds = np.array(region_geoboundaries["bounds"])
+    expected_bounds = np.array([102.14402486, 7.18093148, 117.83545744, 23.39220557])
+    actual_bounds = np.array(region_geoboundaries["bbox"])
     print(actual_bounds)
     assert np.allclose(actual_bounds, expected_bounds)
