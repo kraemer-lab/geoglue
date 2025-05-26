@@ -1,6 +1,7 @@
 "Utility functions for geoglue"
 
 import logging
+import hashlib
 from pathlib import Path
 import shutil
 
@@ -12,6 +13,30 @@ import numpy as np
 
 
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
+
+
+def sha256(file_path: str | Path, prefix: bool = False) -> str:
+    """Returns SHA256 hash of a file
+
+    Parameters
+    ----------
+    file_path : str | Path
+        Path to file
+    prefix : bool
+        Whether to prefix 'sha256:' to the checksum, useful for disambiguating
+        between multiple checksum methods
+
+    Returns
+    -------
+    str
+        Checksum with optional prefix
+    """
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha256_hash.update(chunk)
+    h = sha256_hash.hexdigest()
+    return h if not prefix else "sha256:" + h
 
 
 def crop_dataset_to_geometry(ds: xr.Dataset, geom: gpd.GeoDataFrame) -> xr.Dataset:
