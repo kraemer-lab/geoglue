@@ -7,9 +7,10 @@ from contextlib import contextmanager
 
 import cdo
 import xarray as xr
+from netCDF4 import Dataset
 
 from .memoryraster import MemoryRaster
-from .util import is_lonlat
+from .util import is_lonlat, sha256
 
 
 def resample(
@@ -44,6 +45,7 @@ def resample(
     _cdo = cdo.Cdo()
     if isinstance(infile, str):
         infile = Path(infile)
+    infile_hash = sha256(infile, prefix=True)
     if not is_lonlat(infile):
         raise ValueError(
             "resample only supports lonlat grid, input file does not conform"
@@ -64,7 +66,14 @@ def resample(
                 _cdo.remapbil(griddes.name, input=str(infile), output=str(outfile))
             case "remapdis":
                 _cdo.remapdis(griddes.name, input=str(infile), output=str(outfile))
-        return Path(outfile)
+    # re-open file and add checksums of infile
+
+    nc = Dataset(outfile, mode="a")
+    nc.provenance = f"resample.infile={infile_hash} {infile}\n" + getattr(
+        nc, "provenance", ""
+    )
+    nc.close()
+    return Path(outfile)
 
 
 @contextmanager
