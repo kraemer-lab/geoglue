@@ -17,7 +17,7 @@ from geoglue.cds import (
     get_first_monday,
 )
 from geoglue.region import Region
-from geoglue.types import Bounds
+from geoglue.types import Bbox
 
 BRB: Region = {
     "name": "BRB-1",
@@ -25,7 +25,7 @@ BRB: Region = {
     "pk": "GID_1",
     "tz": "-04:00",
     "url": "https://gadm.org",
-    "bounds": Bounds(north=14, west=-59, south=13, east=-58),
+    "bbox": Bbox(maxy=14, minx=-59, miny=13, maxx=-58),
 }
 
 SGP: Region = {
@@ -34,7 +34,7 @@ SGP: Region = {
     "pk": "GID_1",
     "tz": "+08:00",
     "url": "https://gadm.org",
-    "bounds": Bounds(north=2, west=103, south=1, east=105),
+    "bbox": Bbox(maxy=2, minx=103, miny=1, maxx=105),
 }
 NPL: Region = {
     "name": "NPL-1",
@@ -42,7 +42,9 @@ NPL: Region = {
     "pk": "GID_1",
     "tz": "+05:45",
     "url": "https://gadm.org",
-    "bounds": Bounds(west=80.0884245137, south=26.3978980576, east=88.1748043151, north=30.4227169866)
+    "bbox": Bbox(
+        minx=80.0884245137, miny=26.3978980576, maxx=88.1748043151, maxy=30.4227169866
+    ),
 }
 
 

@@ -14,41 +14,89 @@ import xarray as xr
 
 from cdo import Cdo
 
+class Bbox(NamedTuple):
+    "Geographic bounding box"
 
-class Bounds(NamedTuple):
-    "Geographic bounds"
+    minx: int | float
+    "Western bounds, minimum longitude"
+    miny: int | float
+    "Southern bounds, minimum latitude"
+    maxx: int | float
+    "Eastern bounds, maximum longitude"
+    maxy: int | float
+    "Northern bounds, maximum latitude"
 
-    north: int | float
-    "Northern bounds"
-    west: int | float
-    "Western bounds"
-    south: int | float
-    "Southern bounds"
-    east: int | float
-    "Eastern bounds"
-
-    def __lt__(self, other):
+    def __le__(self, other):
         return (
-            self.north <= other.north
-            and self.west >= other.west
-            and self.south >= other.south
-            and self.east <= other.east
+            self.maxy <= other.maxy
+            and self.minx >= other.minx
+            and self.miny >= other.miny
+            and self.maxx <= other.maxx
         )
 
-    def __gt__(self, other):
+    def __ge__(self, other):
         return (
-            self.north >= other.north
-            and self.west <= other.west
-            and self.south <= other.south
-            and self.east >= other.east
+            self.maxy >= other.maxy
+            and self.minx <= other.minx
+            and self.miny <= other.miny
+            and self.maxx >= other.maxx
         )
 
-    def as_int(self) -> Bounds:
-        north = self.north if isinstance(self.north, int) else math.ceil(self.north)
-        west = self.west if isinstance(self.west, int) else math.floor(self.west)
-        south = self.south if isinstance(self.south, int) else math.floor(self.south)
-        east = self.east if isinstance(self.east, int) else math.ceil(self.east)
-        return Bounds(north, west, south, east)
+    def int(self) -> Bbox:
+        maxy = self.maxy if isinstance(self.maxy, int) else math.ceil(self.maxy)
+        minx = self.minx if isinstance(self.minx, int) else math.floor(self.minx)
+        miny = self.miny if isinstance(self.miny, int) else math.floor(self.miny)
+        maxx = self.maxx if isinstance(self.maxx, int) else math.ceil(self.maxx)
+        return Bbox(minx, miny, maxx, maxy)
+
+    def __str__(self) -> str:
+        return f"{self.minx},{self.miny},{self.maxx},{self.maxy}"
+
+    @staticmethod
+    def from_string(s: str) -> Bbox:
+        "Returns Bbox from standard string representation"
+        values = [x.strip() for x in s.split(",")]
+        
+        def to_num(x):
+            return float(x) if "." in x else int(x)
+        maxy = to_num(values.pop())
+        maxx = to_num(values.pop())
+        miny = to_num(values.pop())
+        minx = to_num(values.pop())
+        return Bbox(minx, miny, maxx, maxy)
+
+
+    def to_list(self, spec: str) -> list[int | float]:
+        """Returns Bbox converted to list of numbers in different order
+
+        The default and standard bbox order is minx,miny,maxx,maxy. Certain
+        applications expect the bbox coordinates in a different order. This method
+        takes a fmt string and returns a list in that order
+
+        Parameters
+        ----------
+        spec : str
+            Either a fully specified string like "maxx,minx,maxy,maxy" or a
+            shorthand. Supported shorthands are "cdsapi" for supplying bbox
+            parameters to ECMWF's cdsapi
+
+        Returns
+        -------
+        list[int | float]
+            Returns a list of bbox coordinates in specified order
+        """
+        if spec == "cdsapi":
+            spec = "maxy,minx,miny,maxx"
+        specs = [s.strip() for s in spec.split(",")]
+        if len(specs) != 4 or set(specs) != {"minx", "miny", "maxx", "maxy"}:
+            raise ValueError(f"All bbox coordinates must be specified, got {spec=}")
+        bbox_values = {
+            "minx": self.minx,
+            "miny": self.miny,
+            "maxx": self.maxx,
+            "maxy": self.maxy,
+        }
+        return [bbox_values[s] for s in specs]
 
 
 @dataclass
@@ -122,7 +170,7 @@ class CdoGriddes:
         with tempfile.NamedTemporaryFile(prefix="geoglue-", suffix=".nc") as f:
             ds.to_netcdf(f.name)
             return CdoGriddes.from_file(f.name)
-        
+
     def approx_equal(self, other: CdoGriddes, rtol=1e-05, atol=1e-08) -> bool:
         "Approximate equality testing, with absolute (atol) and relative (rtol) tolerance"
         float_fields = ["xfirst", "yfirst", "xinc", "yinc"]
