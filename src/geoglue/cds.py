@@ -383,11 +383,6 @@ class ReanalysisSingleLevels:
         Data format to download files in, one of `grib` or `netcdf`, default=`grib`.
         Downloading data in GRIB format allows downloading more variables. GRIB
         files are converted to netCDF, so both options result in identical data files.
-    admin_in_name : bool
-        Whether to keep administrative level in the downloaded name, optional, default=False.
-        This can be useful for jurisdictions where the bounds for administrative
-        levels differ, and the request to cdsapi thus differs. By default, the
-        admin level (e.g. ``-2`` in ``VNM-2``) is removed from the final output file.
     """
 
     def __init__(
@@ -400,16 +395,17 @@ class ReanalysisSingleLevels:
         admin_in_name: bool = False,
     ):
         self.region = region
-        self.bbox = region["bbox"].int()
-        self.timezone_offset = region["tz"]
+        self.bbox = region.bbox.int()
+        self.timezone_offset = region.tz
         self.variables = variables
+
+        name = region.name.split(":")  # remove provider
+        self.name = name[1] if len(name) > 1 else name[0]
 
         # Keep part before admin for name
         # This assumes that the boundaries for a particular name prefix
         # are same across administrative levels
-        self.name = region["name"] if admin_in_name else region["name"].split("-")[0]
-        self.name_without_admin = region["name"].split("-")[0]
-        self.name = region["name"] if admin_in_name else self.name_without_admin
+        self.name_without_admin = self.name.split("-")[0]
         if not (path := path or data_path / self.name_without_admin / "era5").exists():
             path.mkdir(parents=True)
         self.path = path
