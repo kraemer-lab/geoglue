@@ -10,38 +10,35 @@ from geoglue.region import (
     geoboundaries,
     get_timezone,
     get_worldpop_1km,
-    read_region,
-    region_to_string,
-    region_from_string,
     Region,
 )
 from geoglue.types import Bbox
 
 DATA_PATH = Path("data")
 
-EXAMPLE_REGION: Region = {
-    "path": Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp"),
-    "name": "geoboundaries:VNM-2",
-    "tz": "+07:00",
-    "pk": "shapeID",
-    "url": "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
-    "bbox": Bbox(
+EXAMPLE_REGION = Region(
+    "gb:VNM-2",
+    Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp"),
+    "shapeID",
+    "+07:00",
+    "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
+    Bbox(
         maxy=24,
         minx=102,
         miny=7,
         maxx=118,
     ),
-}
+)
 
-EXAMPLE_REGION_STRING = "geoboundaries:VNM-2 102,7,118,24 shapeID +07:00 data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp https://www.geoboundaries.org/api/current/gbOpen/VNM/"
+EXAMPLE_REGION_STRING = "gb:VNM-2 102,7,118,24 shapeID +07:00 data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp https://www.geoboundaries.org/api/current/gbOpen/VNM/"
 
 
 def test_region_to_string():
-    assert region_to_string(EXAMPLE_REGION) == EXAMPLE_REGION_STRING
+    assert str(EXAMPLE_REGION) == EXAMPLE_REGION_STRING
 
 
 def test_region_from_string():
-    assert region_from_string(EXAMPLE_REGION_STRING) == EXAMPLE_REGION
+    assert Region.from_string(EXAMPLE_REGION_STRING) == EXAMPLE_REGION
 
 
 @pytest.fixture(scope="module")
@@ -56,35 +53,35 @@ def region_gadm(_):
 
 
 def test_region_geoboundaries(region_geoboundaries):
-    assert region_geoboundaries == {
-        "path": Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp"),
-        "name": "VNM-2",
-        "tz": "+07:00",
-        "pk": "shapeID",
-        "url": "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
-        "bbox": Bbox(
+    assert region_geoboundaries == Region(
+        "gb:VNM-2",
+        Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp"),
+        "shapeID",
+        "+07:00",
+        "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
+        Bbox(
             maxy=23.392205570000044,
             minx=102.14402486200004,
             miny=7.180931477000058,
             maxx=117.83545743800005,
         ),
-    }
+    )
 
 
 def test_region_gadm(region_gadm):
-    assert region_gadm == {
-        "path": Path.home() / ".local/share/geoglue/VNM/gadm41/gadm41_VNM_2.shp",
-        "name": "VNM-2",
-        "tz": "+07:00",
-        "pk": "GID_2",
-        "url": "https://geodata.ucdavis.edu/gadm/gadm4.1/shp/gadm41_VNM_shp.zip",
-        "bbox": Bbox(
+    assert region_gadm == Region(
+        "gadm:VNM-2",
+        Path.home() / ".local/share/geoglue/VNM/gadm41/gadm41_VNM_2.shp",
+        "GID_2",
+        "+07:00",
+        "https://geodata.ucdavis.edu/gadm/gadm4.1/shp/gadm41_VNM_shp.zip",
+        Bbox(
             maxy=23.39269256700004,
             minx=102.14458465500007,
             miny=8.381355000000099,
             maxx=109.46917000000008,
         ),
-    }
+    )
 
 
 def test_timezone_warnings():
@@ -112,12 +109,11 @@ def test_population_invalid_year():
 
 
 def test_read_shapefiles(region_geoboundaries):
-    shp = read_region(region_geoboundaries)
-    assert {"shapeID", "shapeName"} <= set(shp.columns)
+    assert {"shapeID", "shapeName"} <= set(region_geoboundaries.read().columns)
 
 
 def test_bounds(region_geoboundaries):
     expected_bounds = np.array([102.14402486, 7.18093148, 117.83545744, 23.39220557])
-    actual_bounds = np.array(region_geoboundaries["bbox"])
+    actual_bounds = np.array(region_geoboundaries.bbox)
     print(actual_bounds)
     assert np.allclose(actual_bounds, expected_bounds)
