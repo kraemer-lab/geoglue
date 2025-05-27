@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 import xarray as xr
 from geoglue.zonal_stats import zonal_stats, zonal_stats_xarray
-from geoglue.region import geoboundaries, get_worldpop_1km, read_region
+from geoglue.region import geoboundaries, get_worldpop_1km
 from geoglue.resample import resample
 from geoglue.util import sort_lonlat, find_unique_time_coord
 
@@ -14,7 +14,7 @@ ADMIN2_N = 706
 
 @pytest.fixture(scope="module")
 def vnm_geoboundaries_admin2():
-    df = read_region(geoboundaries("VNM", 2, data_path=DATA_PATH))
+    df = geoboundaries("VNM", 2, data_path=DATA_PATH).read()
 
     # We use era5_extents which use admin0 boundaries. In geoBoundaries data,
     # the admin0 total_bounds are smaller than the admin2 total bounds which

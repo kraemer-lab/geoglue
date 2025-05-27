@@ -5,11 +5,13 @@ to make work with arbitrary shapefiles easier. It also supports
 calculating extents or geospatial bounds, and calculating timezone offsets.
 """
 
+from __future__ import annotations
+
 import shlex
 import logging
 import datetime
 from functools import cache
-from typing import TypedDict
+from typing import NamedTuple
 from pathlib import Path
 
 import pytz
@@ -33,8 +35,8 @@ GEOBOUNDARIES_EXT = SHP_EXT
 LOCALIZE_DATE = datetime.datetime(2022, 1, 1)
 
 
-class Region(TypedDict):
-    "Dictionary representing a geospatial region"
+class Region(NamedTuple):
+    "Tuple representing a geospatial region"
 
     name: str
     "Region identifier without spaces"
@@ -54,45 +56,36 @@ class Region(TypedDict):
     bbox: Bbox
     "Geospatial bounding box"
 
+    def __str__(self) -> str:
+        return " ".join(
+            [
+                self.name,
+                str(self.bbox),
+                shlex.quote(self.pk),
+                self.tz,
+                shlex.quote(str(self.path)),
+                self.url,
+            ]
+        )
 
-def region_to_string(r: Region) -> str:
-    return " ".join(
-        [
-            r["name"],
-            str(r["bbox"]),
-            shlex.quote(r["pk"]),
-            r["tz"],
-            shlex.quote(str(r["path"])),
-            r.get("url", "http://unknown"),
-        ]
-    )
+    @staticmethod
+    def from_string(s: str) -> Region:
+        vals = shlex.split(s)
+        name = vals.pop(0)
+        bbox = Bbox.from_string(vals.pop(0))
+        pk = vals.pop(0)
+        tz = vals.pop(0)
+        path = Path(vals.pop(0))
+        url = vals.pop(0) if vals else "http://unknown"
+        return Region(name, path, pk, tz, url, bbox)
 
-
-def region_from_string(s: str) -> Region:
-    vals = shlex.split(s)
-    name = vals.pop(0)
-    bbox = Bbox.from_string(vals.pop(0))
-    pk = vals.pop(0)
-    tz = vals.pop(0)
-    path = vals.pop(0)
-    url = vals.pop(0) if vals else "http://unknown"
-    return {
-        "name": name,
-        "path": Path(path),
-        "pk": pk,
-        "tz": tz,
-        "url": url,
-        "bbox": bbox,
-    }
-
-
-def read_region(r: Region) -> gpd.GeoDataFrame:
-    "Reads a region shapefile"
-    df = gpd.read_file(r["path"])
-    # drop shapeISO column which is just None
-    if "shapeISO" in df.columns:
-        return df.drop(columns=["shapeISO"])  # type: ignore
-    return df
+    def read(self) -> gpd.GeoDataFrame:
+        "Reads a region shapefile"
+        df = gpd.read_file(self.path)
+        # drop shapeISO column which is just None
+        if "shapeISO" in df.columns:
+            return df.drop(columns=["shapeISO"])  # type: ignore
+        return df
 
 
 def get_timezone(iso3: str, localize_date: datetime.datetime) -> str | None:
@@ -201,14 +194,9 @@ def gadm(
     path = path_geodata / f"gadm41_{iso3}_{admin}.shp"
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
-    return {
-        "name": f"{iso3}-{admin}",
-        "path": path,
-        "pk": f"GID_{admin}",
-        "tz": tzoffset,
-        "url": url,
-        "bbox": get_bbox(path),
-    }
+    return Region(
+        f"gadm:{iso3}-{admin}", path, f"GID_{admin}", tzoffset, url, get_bbox(path)
+    )
 
 
 def geoboundaries(
@@ -268,14 +256,7 @@ def geoboundaries(
     path = path_geodata / f"geoBoundaries-{iso3}-ADM{admin}.shp"
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
-    return {
-        "name": f"{iso3}-{admin}",
-        "path": path,
-        "pk": "shapeID",
-        "tz": tzoffset,
-        "url": url,
-        "bbox": get_bbox(path),
-    }
+    return Region(f"gb:{iso3}-{admin}", path, "shapeID", tzoffset, url, get_bbox(path))
 
 
 @cache
