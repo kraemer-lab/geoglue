@@ -457,9 +457,9 @@ class ReanalysisSingleLevels:
             Path of netCDF file that was written to disk
         """
         suffix = "grib" if self.data_format == "grib" else "zip"
-        outfile = self.path / f"{self.name}-{year}-{self.stub}.{suffix}"
-        accum_file = self.path / f"{self.name}-{year}-{self.stub}.accum.nc"
-        instant_file = self.path / f"{self.name}-{year}-{self.stub}.instant.nc"
+        outfile = self.path / f"{self.name_without_admin}-{year}-{self.stub}.{suffix}"
+        accum_file = self.path / f"{self.name_without_admin}-{year}-{self.stub}.accum.nc"
+        instant_file = self.path / f"{self.name_without_admin}-{year}-{self.stub}.instant.nc"
         if accum_file.exists() and instant_file.exists():
             return CdsPath(instant=instant_file, accum=accum_file)
 
@@ -485,7 +485,7 @@ class ReanalysisSingleLevels:
                 f"Can't perform timeshift for fractional timezone offset: {self.timezone_offset}"
             )
         return DatasetPool(
-            self.path.glob(f"{self.name}-????-{self.stub}.*.nc"), shift_hours=hours
+            self.path.glob(f"{self.name_without_admin}-????-{self.stub}.*.nc"), shift_hours=hours
         )
 
 

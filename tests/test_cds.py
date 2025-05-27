@@ -19,33 +19,34 @@ from geoglue.cds import (
 from geoglue.region import Region
 from geoglue.types import Bbox
 
-BRB: Region = {
-    "name": "BRB-1",
-    "path": "/path/to/BRB.shp",
-    "pk": "GID_1",
-    "tz": "-04:00",
-    "url": "https://gadm.org",
-    "bbox": Bbox(maxy=14, minx=-59, miny=13, maxx=-58),
-}
+BRB = Region(
+    "BRB-1",
+    "/path/to/BRB.shp",
+    "GID_1",
+    "-04:00",
+    "https://gadm.org",
+    Bbox(maxy=14, minx=-59, miny=13, maxx=-58),
+)
 
-SGP: Region = {
-    "name": "SGP-1",
-    "path": "/path/to/SGP.shp",
-    "pk": "GID_1",
-    "tz": "+08:00",
-    "url": "https://gadm.org",
-    "bbox": Bbox(maxy=2, minx=103, miny=1, maxx=105),
-}
-NPL: Region = {
-    "name": "NPL-1",
-    "path": "/path/to/NPL.shp",
-    "pk": "GID_1",
-    "tz": "+05:45",
-    "url": "https://gadm.org",
-    "bbox": Bbox(
+SGP = Region(
+    "SGP-1",
+    "/path/to/SGP.shp",
+    "GID_1",
+    "+08:00",
+    "https://gadm.org",
+    Bbox(maxy=2, minx=103, miny=1, maxx=105),
+)
+
+NPL = Region(
+    "NPL-1",
+    "/path/to/NPL.shp",
+    "GID_1",
+    "+05:45",
+    "https://gadm.org",
+    Bbox(
         minx=80.0884245137, miny=26.3978980576, maxx=88.1748043151, maxy=30.4227169866
     ),
-}
+)
 
 
 # fmt: off
