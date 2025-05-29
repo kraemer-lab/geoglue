@@ -22,7 +22,7 @@ overlap with a zonal polygon.
 geoglue has several modules:
 
 - {mod}`geoglue.cds`: Methods to work with data downloaded from ECMWF's [cdsapi](https://cds.climate.copernicus.eu/how-to-api)
-- {mod}`geoglue.country`: Fetch geospatial boundaries data from
+- {mod}`geoglue.region`: Fetch geospatial boundaries data from
   [GADM](https://gadm.org) or [geoBoundaries](https://www.geoboundaries.org)
 - {mod}`geoglue.memoryraster`: Read and work with GeoTIFF datasets in memory.
 - {mod}`geoglue.resample`: Resample data using the

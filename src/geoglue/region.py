@@ -48,7 +48,10 @@ class Region(NamedTuple):
     "Column ID that is used as primary key to identify regions in shapefile"
 
     tz: str
-    "Timezone as [+-]HH:MM from UTC"
+    """Timezone offset from UTC.
+
+    Expressed as [+-]HH:MM, e.g. +01:00 for CET timezone
+    """
 
     url: str
     "URL from which data was downloaded"

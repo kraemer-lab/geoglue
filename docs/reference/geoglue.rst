@@ -12,10 +12,10 @@ geoglue.cds module
    :undoc-members:
    :show-inheritance:
 
-geoglue.country module
+geoglue.region module
 ----------------------
 
-.. automodule:: geoglue.country
+.. automodule:: geoglue.region
    :members:
    :undoc-members:
    :show-inheritance:
