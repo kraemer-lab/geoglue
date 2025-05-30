@@ -4,8 +4,8 @@ OS="$(uname -s)"
 
 install_if_absent() {
     cmd="$1"
-    pkgname_macos="${2:-1}"
-    pkgname_debian="${3:-1}"
+    pkgname_macos="${2:-$1}"
+    pkgname_debian="${3:-$1}"
     if ! command -v "$cmd" > /dev/null; then
         echo "$1 is not installed."
         if [ "$OS" = "Darwin" ]; then
