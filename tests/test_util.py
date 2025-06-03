@@ -1,7 +1,7 @@
-
 import pytest
 import xarray as xr
 import numpy as np
+from datetime import datetime
 
 from geoglue.types import CdoGriddes
 from geoglue.util import (
@@ -9,7 +9,19 @@ from geoglue.util import (
     is_lonlat,
     set_lonlat_attrs,
     find_unique_time_coord,
+    get_first_monday,
+    get_last_sunday,
 )
+
+
+@pytest.mark.parametrize("year,date", [(2025, "2025-01-06"), (2018, "2018-01-01")])
+def test_get_first_monday(year, date):
+    assert get_first_monday(year) == datetime.fromisoformat(date).date()
+
+
+@pytest.mark.parametrize("year,date", [(2025, "2025-12-28"), (2017, "2017-12-31")])
+def test_get_last_sunday(year, date):
+    assert get_last_sunday(year) == datetime.fromisoformat(date).date()
 
 
 @pytest.mark.parametrize(
