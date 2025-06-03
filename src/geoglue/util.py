@@ -2,6 +2,7 @@
 
 import logging
 import hashlib
+import datetime
 from pathlib import Path
 import shutil
 
@@ -13,6 +14,20 @@ import numpy as np
 
 
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
+
+
+def get_first_monday(year: int) -> datetime.date:
+    "Gets first Monday of the year"
+    return datetime.datetime.strptime(f"{year}-W01-1", "%Y-W%W-%u").date()
+
+
+def get_last_sunday(year: int) -> datetime.date:
+    "Gets last Sunday of year"
+    d = datetime.datetime.strptime(f"{year}-W51-7", "%Y-W%W-%u").date()
+    if (d + datetime.timedelta(days=7)).year == year:  # one more week in the year!
+        return d + datetime.timedelta(days=7)
+    else:
+        return d
 
 
 def sha256(file_path: str | Path, prefix: bool = False) -> str:

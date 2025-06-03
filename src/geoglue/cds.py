@@ -19,8 +19,8 @@ import pandas as pd
 import xarray as xr
 
 from .region import Region
-from .util import find_unique_time_coord
 from . import data_path
+from .util import find_unique_time_coord, get_first_monday
 
 
 DAYS = [f"{i:02d}" for i in range(1, 32)]
@@ -46,11 +46,6 @@ Reducer = Literal["mean", "min", "max", "sum"]
 def _is_hourly(ds: xr.Dataset, time_dim: str = "valid_time") -> bool:
     "Returns True if dataset is hourly"
     return sorted(set(ds[time_dim].dt.strftime("%H:%M").to_numpy())) == TIMES
-
-
-def get_first_monday(year: int) -> datetime.date:
-    "Gets first Monday of the year"
-    return datetime.datetime.strptime(f"{year}-W01-1", "%Y-W%W-%u").date()
 
 
 def concat(a: CdsDataset, b: CdsDataset, time_dim: str = "valid_time") -> CdsDataset:

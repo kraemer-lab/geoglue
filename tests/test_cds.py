@@ -1,6 +1,5 @@
 import tempfile
 from pathlib import Path
-from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -14,7 +13,6 @@ from geoglue.cds import (
     timeshift_hours_cdsdataset,
     DatasetPool,
     grib_to_netcdf,
-    get_first_monday,
 )
 from geoglue.region import Region
 from geoglue.types import Bbox
@@ -305,11 +303,6 @@ def test_grib_netcdf_match():
         # grib_t = getattr(grib, t).drop_vars(["number", "surface"])
         # netcdf_t = getattr(netcdf, t).drop_vars(["number", "expver"])
         # assert grib_t.equals(netcdf_t)
-
-
-@pytest.mark.parametrize("year,date", [(2025, "2025-01-06"), (2018, "2018-01-01")])
-def test_first_monday(year, date):
-    assert get_first_monday(year) == datetime.fromisoformat(date).date()
 
 
 @pytest.mark.parametrize("window", [0, 6])
