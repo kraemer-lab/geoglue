@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import operator
+import logging
 import datetime
 import warnings
 import zipfile
@@ -22,6 +23,7 @@ from .region import Region
 from . import data_path
 from .util import find_unique_time_coord, get_first_monday
 
+logger = logging.getLogger(__name__)
 
 DAYS = [f"{i:02d}" for i in range(1, 32)]
 MONTHS = [f"{i:02d}" for i in range(1, 13)]
@@ -451,6 +453,7 @@ class ReanalysisSingleLevels:
         CdsPath
             Path of netCDF file that was written to disk
         """
+        logger.info("Get reanalysis data for region %s in %d for variables=%r", self.region.name, year, self.variables)
         suffix = "grib" if self.data_format == "grib" else "zip"
         outfile = self.path / f"{self.name_without_admin}-{year}-{self.stub}.{suffix}"
         accum_file = self.path / f"{self.name_without_admin}-{year}-{self.stub}.accum.nc"

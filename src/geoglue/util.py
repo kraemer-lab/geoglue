@@ -12,6 +12,7 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
+logger = logging.getLogger(__name__)
 
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
 
@@ -188,11 +189,11 @@ def download_file(
                 out.write(bits)
         # Unpack file
         if unpack and any(str(path).endswith(ext) for ext in COMPRESSED_FILE_EXTS):
-            logging.info(f"Unpacking downloaded file {path}")
+            logger.info(f"Unpacking downloaded file {path}")
             unpack_file(path, unpack_in_folder)
         return True
     else:
-        logging.error(f"Failed to fetch {url}, status={r.status_code}")
+        logger.error(f"Failed to fetch {url}, status={r.status_code}")
     return False
 
 

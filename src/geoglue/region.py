@@ -117,7 +117,7 @@ def get_timezone(iso3: str, localize_date: datetime.datetime) -> str | None:
     """
     iso2 = pycountry.countries.lookup(iso3).alpha_2
     if len(timezones := pytz.country_timezones[iso2]) > 1:
-        logging.info(
+        logger.info(
             "No unique timezone for %s spanning multiple zones: %r, returning None",
             iso3,
             timezones,
@@ -188,12 +188,12 @@ def gadm(
         for ext in GADM_EXT
     ]
     if not all(f.exists() for f in manifest):
-        logging.info("Missing GADM data for %s, downloading data", iso3)
+        logger.info("Missing GADM data for %s, downloading data", iso3)
         if not download_file(url, path_geodata / url.split("/")[-1]):
             raise ConnectionError(
                 "GADM data download failed %s -> %s", url, path_geodata
             )
-        logging.info("GADM data downloaded to %s", path_geodata)
+        logger.info("GADM data downloaded to %s", path_geodata)
     path = path_geodata / f"gadm41_{iso3}_{admin}.shp"
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
@@ -247,7 +247,7 @@ def geoboundaries(
         for ext in GEOBOUNDARIES_EXT
     ]
     if not all(f.exists() for f in manifest):
-        logging.info("Missing geoBoundaries data for %s, downloading data", iso3)
+        logger.info("Missing geoBoundaries data for %s, downloading data", iso3)
         if not download_file(
             _geoboundaries_shapefile_url(url, adm=admin), path_geodata
         ):
@@ -255,7 +255,7 @@ def geoboundaries(
                 "geoBoundaries data download failed %s -> %s",
                 _geoboundaries_shapefile_url(url, adm=admin),
             )
-        logging.info("geoBoundaries data downloaded to %s", path_geodata)
+        logger.info("geoBoundaries data downloaded to %s", path_geodata)
     path = path_geodata / f"geoBoundaries-{iso3}-ADM{admin}.shp"
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
