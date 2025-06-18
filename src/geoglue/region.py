@@ -10,7 +10,6 @@ from __future__ import annotations
 import shlex
 import logging
 import datetime
-from functools import cache
 from typing import NamedTuple
 from pathlib import Path
 
@@ -21,7 +20,6 @@ import geopandas as gpd
 
 import geoglue
 
-from .memoryraster import MemoryRaster
 from .util import download_file
 from .types import Bbox
 
@@ -260,38 +258,3 @@ def geoboundaries(
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
     return Region(f"gb:{iso3}-{admin}", path, "shapeID", tzoffset, url, get_bbox(path))
-
-
-@cache
-def get_worldpop_1km(
-    iso3: str, year: int, data_path: Path | None = None
-) -> MemoryRaster:
-    """Downloads and returns WorldPop population raster (1km resolution) for a particular year
-
-    Data is only available from 2000-2020.
-
-    Parameters
-    ----------
-    iso3 : str
-        ISO3 code of country
-    year : int
-        Year for which to download data
-    data_path : Path | None
-        Optional. If specified, sets the data path where population data will be downloaded,
-        otherwise defaults to ``~/.local/share/geoglue``
-
-    Returns
-    -------
-    MemoryRaster
-        MemoryRaster representing the population data
-    """
-    if year < 2000 or year > 2020:
-        raise ValueError("Worldpop population data is only available from 2000-2020")
-    path_population = (data_path or geoglue.data_path) / iso3 / "worldpop"
-    path_population.mkdir(parents=True, exist_ok=True)
-    url = f"https://data.worldpop.org/GIS/Population/Global_2000_2020_1km_UNadj/{year}/{iso3}/{iso3.lower()}_ppp_{year}_1km_Aggregated_UNadj.tif"
-    output_path = path_population / url.split("/")[-1]
-    if output_path.exists() or download_file(url, output_path):
-        return MemoryRaster.read(output_path)
-    else:
-        raise requests.ConnectionError(f"Failed to download {url=}")
