@@ -36,7 +36,7 @@ from rasterio.transform import from_origin
 from rasterio.io import MemoryFile
 from rasterio.warp import calculate_default_transform, reproject
 
-from .types import CdoGriddes
+from .types import CdoGriddes, Bbox
 from .util import sha256
 
 DEFAULT_COLORMAP = "viridis"
@@ -78,6 +78,7 @@ class MemoryRaster:
     driver : str
         rasterio driver, optional, default='GTiff'
     """
+
     data: np.ndarray | np.ma.MaskedArray | xr.DataArray
     transform: affine.Affine
     crs: str | pyproj.crs.CRS | None
@@ -165,6 +166,14 @@ class MemoryRaster:
             yinc=yinc,
         )
 
+    @property
+    def bbox(self) -> Bbox:
+        "Bounding box of MemoryRaster"
+        g = self.griddes
+        return Bbox(
+            g.xfirst, g.yfirst, g.xfirst + g.xinc * g.xsize, g.yfirst + g.yinc * g.ysize
+        )
+
     def min(self) -> float:
         "Minimum value in raster"
         return np.ma.min(self.data)
@@ -186,7 +195,11 @@ class MemoryRaster:
         )
 
     def checksum(self) -> str:
-        h = sha256(self.origin_path, prefix=True) if self.origin_path else "<hash:unknown>"
+        h = (
+            sha256(self.origin_path, prefix=True)
+            if self.origin_path
+            else "<hash:unknown>"
+        )
         return f"MemoryRaster.origin_path={h} {self.origin_path} {self.width}x{self.height}"
 
     @staticmethod
@@ -315,7 +328,7 @@ class MemoryRaster:
                 data = self.data.filled(0)  # type: ignore
                 profile = copy.deepcopy(self.profile)
                 # zfill is set, so we explicitly ignore nodata
-                del profile['nodata']
+                del profile["nodata"]
             else:
                 data = self.data
                 profile = self.profile
@@ -355,7 +368,7 @@ class MemoryRaster:
                     transform,
                     self.crs,
                     self.nodata,
-                    self.origin_path
+                    self.origin_path,
                 )
 
     def plot(self, cmap: str = DEFAULT_COLORMAP, fill_nodata=None, **kwargs):
@@ -431,7 +444,6 @@ class MemoryRaster:
         weights: MemoryRaster | None = None,
         **kwargs,
     ) -> pd.DataFrame | gpd.GeoDataFrame:
-
         """Calculate zonal statistics using exactextract
 
         Parameters
