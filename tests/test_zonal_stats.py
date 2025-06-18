@@ -3,8 +3,9 @@ from pathlib import Path
 import pytest
 import xarray as xr
 from geoglue.zonal_stats import zonal_stats, zonal_stats_xarray
-from geoglue.region import geoboundaries, get_worldpop_1km
+from geoglue.region import geoboundaries
 from geoglue.resample import resample
+from geoglue.memoryraster import MemoryRaster
 from geoglue.util import sort_lonlat, find_unique_time_coord
 
 DATA_PATH = Path("data")
@@ -26,7 +27,7 @@ def vnm_geoboundaries_admin2():
 
 @pytest.fixture(scope="module")
 def vnm_pop():
-    return get_worldpop_1km("VNM", 2020, data_path=DATA_PATH)
+    return MemoryRaster.read("data/VNM/worldpop/vnm_ppp_2020_1km_Aggregated_UNadj.tif")
 
 
 @pytest.fixture(scope="module")

@@ -101,8 +101,9 @@ def resampled_dataset(
     Example
     -------
     >>> from geoglue.resample import resampled_dataset
-    >>> from geoglue.region import get_worldpop_1km
-    >>> with resampled_dataset("remapbil", "somefile.nc", get_worldpop_1km('ABC', 2020)) as ds:
+    >>> from geoglue import MemoryRaster
+    >>> pop = MemoryRaster.read("VNM_ppp_2000_1km_Aggregated_UNadj.tif")
+    >>> with resampled_dataset("remapbil", "somefile.nc", pop) as ds:
     ...     print(ds)
     """
     if isinstance(data, xr.Dataset):

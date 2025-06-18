@@ -5,11 +5,11 @@ import pytest
 import numpy as np
 from unittest.mock import patch
 
+from geoglue.memoryraster import MemoryRaster
 from geoglue.region import (
     gadm,
     geoboundaries,
     get_timezone,
-    get_worldpop_1km,
     Region,
 )
 from geoglue.types import Bbox
@@ -97,15 +97,8 @@ def test_invalid_admin_raises_error():
 
 @pytest.mark.parametrize("year,population", [(2000, 79910432), (2020, 97338600)])
 def test_worldpop_1km(year, population):
-    assert int(get_worldpop_1km("VNM", year, data_path=DATA_PATH).sum()) == population
-
-
-def test_population_invalid_year():
-    err = "Worldpop population data is only available from 2000-2020"
-    with pytest.raises(ValueError, match=err):
-        get_worldpop_1km("VNM", 1999)
-    with pytest.raises(ValueError, match=err):
-        get_worldpop_1km("VNM", 2040)
+    rast = MemoryRaster.read(f"data/VNM/worldpop/vnm_ppp_{year}_1km_Aggregated_UNadj.tif")
+    assert int(rast.sum()) == population
 
 
 def test_read_shapefiles(region_geoboundaries):
