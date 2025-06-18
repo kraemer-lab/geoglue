@@ -7,7 +7,7 @@ import pandas as pd
 from rasterio.enums import Resampling
 import pytest
 
-from geoglue.types import CdoGriddes
+from geoglue.types import CdoGriddes, Bbox
 from geoglue.memoryraster import get_numpy_dtype, MemoryRaster
 
 DATA_PATH = Path("data")
@@ -24,6 +24,15 @@ def test_aedes_checksum(aedes):
     assert (
         aedes.checksum()
         == "MemoryRaster.origin_path=sha256:64f38840ad4d349fb36f79ae699bfa9a339769c188797a6ff8ec0a7ac2a5a24d data/aegypti.tif 378x390"
+    )
+
+
+def test_bbox(aedes):
+    assert aedes.bbox == Bbox(
+        minx=102.12488715,
+        miny=7.166639800000009,
+        maxx=117.87488085000001,
+        maxy=23.416633300000008,
     )
 
 

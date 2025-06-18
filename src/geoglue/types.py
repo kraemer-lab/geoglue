@@ -11,6 +11,7 @@ from dataclasses import dataclass, asdict
 
 import numpy as np
 import xarray as xr
+import shapely.geometry
 
 from cdo import Cdo
 
@@ -48,6 +49,10 @@ class Bbox(NamedTuple):
         miny = self.miny if isinstance(self.miny, int) else math.floor(self.miny)
         maxx = self.maxx if isinstance(self.maxx, int) else math.ceil(self.maxx)
         return Bbox(minx, miny, maxx, maxy)
+
+    def as_polygon(self) -> shapely.geometry.Polygon:
+        return shapely.geometry.box(self.minx, self.miny, self.maxx, self.maxy)
+
 
     def __str__(self) -> str:
         return f"{self.minx},{self.miny},{self.maxx},{self.maxy}"
