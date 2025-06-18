@@ -31,7 +31,7 @@ import rasterio
 import rasterio.enums
 import rasterio.mask
 import rasterio.plot
-
+import shapely.geometry
 from rasterio.transform import from_origin
 from rasterio.io import MemoryFile
 from rasterio.warp import calculate_default_transform, reproject
@@ -339,7 +339,9 @@ class MemoryRaster:
                 yield dataset
 
     def mask(
-        self, geometry: gpd.GeoDataFrame | gpd.GeoSeries, crop: bool = True
+        self,
+        geometry: gpd.GeoDataFrame | gpd.GeoSeries | list[shapely.geometry.Polygon],
+        crop: bool = True,
     ) -> MemoryRaster:
         """Mask raster file with a set of geometries
 
@@ -370,6 +372,13 @@ class MemoryRaster:
                     self.nodata,
                     self.origin_path,
                 )
+
+    def crop(self, bbox: Bbox) -> MemoryRaster:
+        "Crop a MemoryRaster to bounds"
+        # Check that bbox to crop to is enclosed within present bbox
+        if not bbox < self.bbox:
+            raise ValueError(f"crop(): provided {bbox!r} not contained in raster {self.bbox!r}")
+        return self.mask([bbox.as_polygon()])
 
     def plot(self, cmap: str = DEFAULT_COLORMAP, fill_nodata=None, **kwargs):
         "Plots a MemoryRaster using sensible defaults"

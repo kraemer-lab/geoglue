@@ -15,6 +15,7 @@ import shapely.geometry
 
 from cdo import Cdo
 
+
 class Bbox(NamedTuple):
     "Geographic bounding box"
 
@@ -35,6 +36,9 @@ class Bbox(NamedTuple):
             and self.maxx <= other.maxx
         )
 
+    def __lt__(self, other):
+        return self <= other and not (self == other)
+
     def __ge__(self, other):
         return (
             self.maxy >= other.maxy
@@ -42,6 +46,9 @@ class Bbox(NamedTuple):
             and self.miny <= other.miny
             and self.maxx >= other.maxx
         )
+
+    def __gt__(self, other):
+        return self >= other and not (self == other)
 
     def int(self) -> Bbox:
         maxy = self.maxy if isinstance(self.maxy, int) else math.ceil(self.maxy)
@@ -53,7 +60,6 @@ class Bbox(NamedTuple):
     def as_polygon(self) -> shapely.geometry.Polygon:
         return shapely.geometry.box(self.minx, self.miny, self.maxx, self.maxy)
 
-
     def __str__(self) -> str:
         return f"{self.minx},{self.miny},{self.maxx},{self.maxy}"
 
@@ -61,15 +67,15 @@ class Bbox(NamedTuple):
     def from_string(s: str) -> Bbox:
         "Returns Bbox from standard string representation"
         values = [x.strip() for x in s.split(",")]
-        
+
         def to_num(x):
             return float(x) if "." in x else int(x)
+
         maxy = to_num(values.pop())
         maxx = to_num(values.pop())
         miny = to_num(values.pop())
         minx = to_num(values.pop())
         return Bbox(minx, miny, maxx, maxy)
-
 
     def to_list(self, spec: str) -> list[int | float]:
         """Returns Bbox converted to list of numbers in different order

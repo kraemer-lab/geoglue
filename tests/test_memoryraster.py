@@ -11,6 +11,7 @@ from geoglue.types import CdoGriddes, Bbox
 from geoglue.memoryraster import get_numpy_dtype, MemoryRaster
 
 DATA_PATH = Path("data")
+HCMC = Bbox(106, 10, 107.25, 11.25)
 
 
 @pytest.fixture(scope="module")
@@ -34,6 +35,22 @@ def test_bbox(aedes):
         maxx=117.87488085000001,
         maxy=23.416633300000008,
     )
+
+
+def test_crop(aedes):
+    cropped_aedes = aedes.crop(HCMC)
+    # TODO: check why this does not exactly align!
+    assert cropped_aedes.bbox == Bbox(
+        minx=105.99988560000001,
+        miny=9.999972000000009,
+        maxx=107.29155175000001,
+        maxy=11.291638150000008,
+    )
+
+
+def test_crop_failure(aedes):
+    with pytest.raises(ValueError):
+        aedes.crop(Bbox(100, 10, 107.25, 111))
 
 
 @pytest.fixture(scope="module")
