@@ -1,5 +1,6 @@
 import os
 import tempfile
+import warnings
 from pathlib import Path
 from typing import Literal
 from collections.abc import Iterator
@@ -11,7 +12,9 @@ from netCDF4 import Dataset
 
 from .memoryraster import MemoryRaster
 from .util import is_lonlat, sha256
+from .types import Bbox
 
+WARN_BELOW_OVERLAP = 0.8
 
 def resample(
     resampling: Literal["remapbil", "remapdis"],
@@ -46,6 +49,24 @@ def resample(
     if isinstance(infile, str):
         infile = Path(infile)
     infile_hash = sha256(infile, prefix=True)
+    raster_bbox = Bbox.from_xarray(xr.open_dataset(infile))
+    if (i_bbox := raster_bbox & target.bbox) is None:
+        raise ValueError("No intersection between input raster and target")
+    i_area = i_bbox.geodetic_area_km2
+    overlap = min(
+        i_area / raster_bbox.geodetic_area_km2, i_area / target.bbox.geodetic_area_km2
+    )
+    if overlap < WARN_BELOW_OVERLAP:
+        warnings.warn(f"""
+Insufficient overlap ({overlap:.1%}, expected {WARN_BELOW_OVERLAP:.0%}) between input raster
+and target. CDO resample may result in (unintended) NA values in the output.
+Consider using MemoryRaster.crop() or DataArray.sel() to match extents of input
+raster and target raster; which should ideally only vary in grid cell size.
+
+Raster bounds: {raster_bbox}
+Target bounds: {target.bbox}
+""")
+
     if not is_lonlat(infile):
         raise ValueError(
             "resample only supports lonlat grid, input file does not conform"
