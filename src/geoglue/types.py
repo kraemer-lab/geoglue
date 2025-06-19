@@ -73,6 +73,16 @@ class Bbox(NamedTuple):
     def __str__(self) -> str:
         return f"{self.minx},{self.miny},{self.maxx},{self.maxy}"
 
+    def __and__(self, other) -> Bbox | None:
+        iminx = max(self.minx, other.minx)
+        iminy = max(self.miny, other.miny)
+        imaxx = min(self.maxx, other.maxx)
+        imaxy = min(self.maxy, other.maxy)
+
+        if iminx < imaxx and iminy < imaxy:
+            return Bbox(iminx, iminy, imaxx, imaxy)
+        return None
+
     @staticmethod
     def from_xarray(da: xr.DataArray | xr.Dataset) -> Bbox:
         coords = set(da.coords)
