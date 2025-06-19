@@ -12,9 +12,11 @@ from dataclasses import dataclass, asdict
 import numpy as np
 import xarray as xr
 import shapely.geometry
+from pyproj import Geod
 
 from cdo import Cdo
 
+geod = Geod(ellps="WGS84")
 
 class Bbox(NamedTuple):
     "Geographic bounding box"
@@ -60,8 +62,35 @@ class Bbox(NamedTuple):
     def as_polygon(self) -> shapely.geometry.Polygon:
         return shapely.geometry.box(self.minx, self.miny, self.maxx, self.maxy)
 
+    @property
+    def geodetic_area_km2(self) -> float:
+        lons = [self.minx, self.maxx, self.maxx, self.minx, self.minx]
+        lats = [self.miny, self.miny, self.maxy, self.maxy, self.miny]
+    
+        area, _ = geod.polygon_area_perimeter(lons, lats)
+        return abs(area) / 1e6
+
     def __str__(self) -> str:
         return f"{self.minx},{self.miny},{self.maxx},{self.maxy}"
+
+    @staticmethod
+    def from_xarray(da: xr.DataArray | xr.Dataset) -> Bbox:
+        coords = set(da.coords)
+        c_lon, c_lat = None, None
+        if {"lon", "lat"} < coords:
+            c_lon, c_lat = "lon", "lat"
+        if {"longitude", "latitude"} < coords:
+            c_lon, c_lat = "longitude", "latitude"
+        if c_lon is None and c_lat is None:
+            raise ValueError("""Can only convert from DataArray or Dataset that has
+latitude and longitude information, that has to be stored in
+coordinates named lat, lon or latitude, longitude""")
+        return Bbox(
+            da[c_lon].min().item(),
+            da[c_lat].min().item(),
+            da[c_lon].max().item(),
+            da[c_lat].max().item(),
+        )
 
     @staticmethod
     def from_string(s: str) -> Bbox:
