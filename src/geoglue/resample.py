@@ -16,6 +16,7 @@ from .types import Bbox
 
 WARN_BELOW_OVERLAP = 0.8
 
+
 def resample(
     resampling: Literal["remapbil", "remapdis"],
     infile: str | Path,
@@ -50,12 +51,8 @@ def resample(
         infile = Path(infile)
     infile_hash = sha256(infile, prefix=True)
     raster_bbox = Bbox.from_xarray(xr.open_dataset(infile))
-    if (i_bbox := raster_bbox & target.bbox) is None:
+    if (overlap := raster_bbox.overlap_fraction(target.bbox)) == 0:
         raise ValueError("No intersection between input raster and target")
-    i_area = i_bbox.geodetic_area_km2
-    overlap = min(
-        i_area / raster_bbox.geodetic_area_km2, i_area / target.bbox.geodetic_area_km2
-    )
     if overlap < WARN_BELOW_OVERLAP:
         warnings.warn(f"""
 Insufficient overlap ({overlap:.1%}, expected {WARN_BELOW_OVERLAP:.0%}) between input raster

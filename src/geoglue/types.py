@@ -18,6 +18,7 @@ from cdo import Cdo
 
 geod = Geod(ellps="WGS84")
 
+
 class Bbox(NamedTuple):
     "Geographic bounding box"
 
@@ -66,9 +67,16 @@ class Bbox(NamedTuple):
     def geodetic_area_km2(self) -> float:
         lons = [self.minx, self.maxx, self.maxx, self.minx, self.minx]
         lats = [self.miny, self.miny, self.maxy, self.maxy, self.miny]
-    
+
         area, _ = geod.polygon_area_perimeter(lons, lats)
         return abs(area) / 1e6
+
+    def overlap_fraction(self, other: Bbox) -> float:
+        if (i_bbox := self & other) is None:
+            return 0
+        return i_bbox.geodetic_area_km2 / max(
+            self.geodetic_area_km2, other.geodetic_area_km2
+        )
 
     def __str__(self) -> str:
         return f"{self.minx},{self.miny},{self.maxx},{self.maxy}"
