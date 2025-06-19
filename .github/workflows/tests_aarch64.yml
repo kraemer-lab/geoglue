@@ -1,0 +1,29 @@
+name: tests-aarch64
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+    - uses: astral-sh/setup-uv@v5
+    - name: Download cdo package
+      run: wget http://ftp.uk.debian.org/debian/pool/main/c/cdo/cdo_2.5.1-1_arm64.deb
+    - name: Install cdo
+      run: sudo apt install ./cdo_2.5.1-1_arm64.deb
+    - name: Install build dependencies
+      run: ./scripts/install_exactextract_build_deps.sh
+    - name: Lint and test
+      run: uvx nox
