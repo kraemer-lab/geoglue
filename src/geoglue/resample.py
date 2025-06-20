@@ -50,7 +50,7 @@ def resample(
     if isinstance(infile, str):
         infile = Path(infile)
     infile_hash = sha256(infile, prefix=True)
-    raster_bbox = Bbox.from_xarray(xr.open_dataset(infile))
+    raster_bbox = Bbox.from_xarray(xr.open_dataset(infile, decode_timedelta=True))
     if (overlap := raster_bbox.overlap_fraction(target.bbox)) == 0:
         raise ValueError("No intersection between input raster and target")
     if overlap < WARN_BELOW_OVERLAP:
