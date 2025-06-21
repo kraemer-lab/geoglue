@@ -5,22 +5,24 @@ utilities to time-shift the data to a particular timezone
 
 from __future__ import annotations
 
-import re
-import operator
-import logging
+import json
+import calendar
 import datetime
+import logging
+import operator
+import re
 import warnings
 import zipfile
 from pathlib import Path
-from typing import NamedTuple, Literal, Iterable
+from typing import Iterable, Literal, NamedTuple, Sequence
 
 import cdsapi
 import numpy as np
 import pandas as pd
 import xarray as xr
+import geoglue
 
 from .region import Region
-from . import data_path
 from .util import find_unique_time_coord, get_first_monday
 
 logger = logging.getLogger(__name__)
@@ -43,6 +45,13 @@ CFGRIB_FILTER = {
 
 INSTANT_AGG = ["mean", "min", "max"]
 Reducer = Literal["mean", "min", "max", "sum"]
+
+LAST_DAY = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+
+def is_end_of_month(d: datetime.date) -> bool:
+    leap_offset = int(calendar.isleap(d.year)) if d.month == 2 else 0
+    return d == datetime.date(d.year, d.month, LAST_DAY[d.month - 1] + leap_offset)
 
 
 def _is_hourly(ds: xr.Dataset, time_dim: str = "valid_time") -> bool:
@@ -115,11 +124,22 @@ class CdsDataset(NamedTuple):
             raise ValueError(f"Time dimension {dim=} not found in accum dataset")
         return dim
 
-    def isel(self, **kwargs) -> CdsDataset:
+    def isel(self, *args, **kwargs) -> CdsDataset:
+        "Select slices by index from both instant and accumulated datasets"
+        return CdsDataset(
+            instant=self.instant.isel(*args, **kwargs),
+            accum=self.accum.isel(*args, **kwargs),
+        )
+
+    def sel(self, *args, **kwargs) -> CdsDataset:
         "Select slices from both instant and accumulated datasets"
         return CdsDataset(
-            instant=self.instant.isel(**kwargs), accum=self.accum.isel(**kwargs)
+            instant=self.instant.sel(*args, **kwargs),
+            accum=self.accum.sel(*args, **kwargs),
         )
+
+    def equals(self, other: CdsDataset) -> bool:
+        return self.instant.equals(other.instant) and self.accum.equals(other.accum)
 
     def daily(self) -> CdsDataset:
         "Returns CdsDataset corresponding to daily aggregation, mean for instant, sum for accumulated variables"
@@ -183,6 +203,39 @@ class CdsPath(NamedTuple):
         return (self.instant is None or self.instant.exists()) and (
             self.accum is None or self.accum.exists()
         )
+
+
+def chunk_months(cds_data: CdsPath, stub: str, folder: Path) -> list[CdsPath]:
+    ds = cds_data.as_dataset()
+    min_year = pd.to_datetime(ds.instant.valid_time.min().values).year
+    max_year = pd.to_datetime(ds.instant.valid_time.max().values).year
+    # region name or iso3 is the first part by convention
+    region_name = str(cds_data.instant.stem).split("-")[0]
+    if min_year != max_year:
+        raise ValueError(
+            "chunk_months() is intended to be used for data within a calendar year"
+        )
+    year = min_year
+    instant = ds.instant.sortby("valid_time")
+    accum = ds.accum.sortby("valid_time")
+    instant_files = []
+    accum_files = []
+
+    for month, m_instant in instant.groupby("valid_time.month"):
+        assert is_end_of_month(pd.to_datetime(m_instant.valid_time.max().values).date())
+        m_instant.to_netcdf(
+            outpath := folder / f"{region_name}-{year}-{month:02d}-{stub}.instant.nc"
+        )
+        instant_files.append(outpath)
+
+    for month, m_accum in accum.groupby("valid_time.month"):
+        assert is_end_of_month(pd.to_datetime(m_accum.valid_time.max().values).date())
+        m_accum.to_netcdf(
+            outpath := folder / f"{region_name}-{year}-{month:02d}-{stub}.accum.nc"
+        )
+        accum_files.append(outpath)
+
+    return [CdsPath(i, a) for i, a in zip(instant_files, accum_files)]
 
 
 def timeshift_hours(
@@ -337,7 +390,7 @@ def era5_extract_hourly_data(file: Path, extract_path: Path) -> CdsPath:
         raise ValueError(f"Error extracting hourly data from {file=}")
 
 
-def grib_to_netcdf(file: Path, path: Path) -> CdsPath:
+def grib_to_netcdf(file: Path, path: Path | None = None) -> CdsPath:
     """Converts GRIB to netCDF
 
     Parameters
@@ -345,18 +398,22 @@ def grib_to_netcdf(file: Path, path: Path) -> CdsPath:
     file
         GRIB file to open
     path
-        Parent folder to save netCDF files
+        Parent folder to save netCDF files, optional. If not specified
+        write to the same folder as the GRIB file
 
     Returns
     -------
     CdsPath
         Path to converted netCDF dataset
     """
+    path = path or file.parent
     assert file.suffix == ".grib"
     paths = {}
     for t in ["instant", "accum"]:
         ds = xr.open_dataset(file, engine="cfgrib", backend_kwargs=CFGRIB_FILTER[t])
         paths[t] = path / (file.stem + "." + t + ".nc")
+        if paths[t].exists():
+            paths[t].unlink()
         ds.to_netcdf(paths[t])
     return CdsPath(**paths)
 
@@ -403,7 +460,9 @@ class ReanalysisSingleLevels:
         # This assumes that the boundaries for a particular name prefix
         # are same across administrative levels
         self.name_without_admin = self.name.split("-")[0]
-        if not (path := path or data_path / self.name_without_admin / "era5").exists():
+        if not (
+            path := path or geoglue.data_path / self.name_without_admin / "era5"
+        ).exists():
             path.mkdir(parents=True)
         self.path = path
         self.stub = stub
@@ -415,10 +474,26 @@ class ReanalysisSingleLevels:
             f"path={self.path!r}, stub={self.stub!r}, data_format={self.data_format!r})"
         )
 
-    def _cdsapi_request(self, year: int) -> dict[str, list[str] | list[int] | str]:
-        "Returns cdsapi request dictionary for a given year"
+    def _cdsapi_request(
+        self,
+        year: int,
+        months: Sequence[int] | int | None = None,
+        days: Sequence[int] | None = None,
+        data_format: Literal["grib", "netcdf"] | None = None,
+    ) -> dict[str, list[str] | list[int] | str]:
+        "Returns cdsapi request dictionary for a given year, either full or partial"
+        months = months or range(1, 13)
+        days = days or range(1, 32)
+        if isinstance(months, int):
+            months = [months]
+        if min(months) < 1 or max(months) > 12:
+            raise ValueError(f"Invalid month supplied in {months}")
+        if min(days) < 1 or max(days) > 31:
+            raise ValueError(f"Invalid days supplied in {days}")
+
+        data_format = data_format or self.data_format
         cur_year = datetime.datetime.now().year
-        download_format = "unarchived" if self.data_format == "grib" else "zip"
+        download_format = "unarchived" if data_format == "grib" else "zip"
         if year < 1940 or year > cur_year:
             raise ValueError(
                 f"ERA5 reanalysis data only available from 1940-{cur_year}"
@@ -427,13 +502,100 @@ class ReanalysisSingleLevels:
             "product_type": ["reanalysis"],
             "variable": self.variables,
             "year": [str(year)],
-            "month": MONTHS,
-            "day": DAYS,
+            "month": [f"{i:02d}" for i in months],
+            "day": [f"{i:02d}" for i in days],
             "time": TIMES,
             "data_format": self.data_format,
             "download_format": download_format,
             "area": self.bbox.to_list("cdsapi"),  # type: ignore
         }
+
+    def get_current_year(
+        self,
+        start_date: datetime.date | str,
+        end_date: datetime.date | str,
+        skip_exists: bool = True,
+    ) -> list[CdsPath] | None:
+        """Fetches hourly data for a particular date range for the current year"""
+        if isinstance(start_date, str):
+            start_date = datetime.date.fromisoformat(start_date)
+        if isinstance(end_date, str):
+            end_date = datetime.date.fromisoformat(end_date)
+        chunks: list[CdsPath] = []
+        cur = datetime.datetime.today().date()
+        if start_date > end_date:
+            raise ValueError(f"Improper date range, {start_date=}, {end_date}")
+        if start_date.year != cur.year or end_date.year != cur.year:
+            raise ValueError("""get_current_year() should only be used for dates in the current year
+        for monthly downloads. To download an entire year at once, use get()""")
+        if start_date > cur:
+            raise ValueError(f"Date in future: {start_date=}")
+        if end_date > cur:
+            raise ValueError(f"Date in future: {end_date=}")
+
+        # ERA5 releases data with a lag of 5 days, so offset by 6
+        last_date_available = cur - datetime.timedelta(days=6)
+        if end_date > last_date_available:
+            warnings.warn(
+                f"Last day ERA5 data is available for is {last_date_available}"
+            )
+            end_date = last_date_available
+        # if end date falls on the last day of the previous month, partial data does not need to be downloaded
+        partial_month = end_date.month == cur.month or (
+            end_date.month == cur.month - 1
+            and (end_date + datetime.timedelta(days=1)).day != 1
+        )
+        end_month = end_date.month
+
+        # current month has to be downloaded separately
+        if partial_month:
+            end_month -= 1
+
+        def _monthly_data(m: int) -> CdsPath:
+            root = f"{self.name_without_admin}-{cur.year}-{m:02d}-{self.stub}"
+            return CdsPath(
+                self.path / f"{root}.instant.nc", self.path / f"{root}.accum.nc"
+            )
+
+        request_months = [
+            m
+            for m in range(start_date.month, end_month + 1)
+            if not _monthly_data(m).exists()
+        ]
+        request_months.sort()
+        month_str = ",".join(map(str, request_months))
+        scratch_file = (
+            geoglue.cache_path / f"{self.name_without_admin}-{month_str}-era5.grib"
+        )
+        if request_months and (not scratch_file.exists() or not skip_exists):
+            request = self._cdsapi_request(cur.year, request_months, data_format="grib")
+            logger.info("Sending cdsapi request: %s", json.dumps(request))
+            client = cdsapi.Client()
+            client.retrieve("reanalysis-era5-single-levels", request, scratch_file)
+
+            # Process downloaded file and chunk into monthly with the last chunk
+            # being marked with _part. The last chunk will always be overwritten on
+            # fresh request for the same month; whole months will not be redownloaded
+            chunks.extend(chunk_months(grib_to_netcdf(scratch_file), "era5", self.path))
+
+        # Always download current month to overwrite existing data
+        partial_file = (
+            self.path
+            / f"{self.name_without_admin}-{cur.year}-{end_date.month:02d}_part-{self.stub}.grib"
+        )
+        if partial_month:
+            request = self._cdsapi_request(
+                cur.year, end_date.month, range(1, end_date.day + 1)
+            )
+            logger.info("Sending cdsapi request: %s", json.dumps(request))
+            client = cdsapi.Client()
+            client.retrieve("reanalysis-era5-single-levels", request, partial_file)
+        chunks.append(grib_to_netcdf(partial_file))
+        if not all(c.exists() for c in chunks):
+            raise FileNotFoundError(
+                "Chunks not found: " + str([c for c in chunks if not c.exists()]),
+            )
+        return chunks
 
     def get(self, year: int, skip_exists: bool = True) -> CdsPath | None:
         """Fetches hourly data for a particular year.
@@ -453,11 +615,20 @@ class ReanalysisSingleLevels:
         CdsPath
             Path of netCDF file that was written to disk
         """
-        logger.info("Get reanalysis data for region %s in %d for variables=%r", self.region.name, year, self.variables)
+        logger.info(
+            "Get reanalysis data for region %s in %d for variables=%r",
+            self.region.name,
+            year,
+            self.variables,
+        )
         suffix = "grib" if self.data_format == "grib" else "zip"
         outfile = self.path / f"{self.name_without_admin}-{year}-{self.stub}.{suffix}"
-        accum_file = self.path / f"{self.name_without_admin}-{year}-{self.stub}.accum.nc"
-        instant_file = self.path / f"{self.name_without_admin}-{year}-{self.stub}.instant.nc"
+        accum_file = (
+            self.path / f"{self.name_without_admin}-{year}-{self.stub}.accum.nc"
+        )
+        instant_file = (
+            self.path / f"{self.name_without_admin}-{year}-{self.stub}.instant.nc"
+        )
         if accum_file.exists() and instant_file.exists():
             return CdsPath(instant=instant_file, accum=accum_file)
 
@@ -483,7 +654,8 @@ class ReanalysisSingleLevels:
                 f"Can't perform timeshift for fractional timezone offset: {self.timezone_offset}"
             )
         return DatasetPool(
-            self.path.glob(f"{self.name_without_admin}-????-{self.stub}.*.nc"), shift_hours=hours
+            self.path.glob(f"{self.name_without_admin}-????-{self.stub}.*.nc"),
+            shift_hours=hours,
         )
 
 
