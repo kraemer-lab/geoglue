@@ -92,7 +92,7 @@ def zonal_stats(
         if "(" in operation
         else operation
     )
-    out = pd.DataFrame(data=[], columns=include_cols + ["value", "date"])  # type: ignore
+    out = None
     for date in da.coords[time_coord].values:
         rast = MemoryRaster.from_xarray(da.sel({time_coord: date}))
         if weights:
@@ -122,7 +122,7 @@ def zonal_stats(
             ).rename(columns={exactextract_output_column: "value"})
 
         df["date"] = date
-        out = pd.concat([out, df])
+        out = df if out is None else pd.concat([out, df])
     return out
 
 
