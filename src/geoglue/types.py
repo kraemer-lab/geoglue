@@ -123,7 +123,15 @@ coordinates named lat, lon or latitude, longitude""")
         miny = to_num(values.pop())
         minx = to_num(values.pop())
         return Bbox(minx, miny, maxx, maxy)
-
+    
+    @property
+    def lat_slice(self) -> slice:
+        return slice(self.maxy, self.miny)
+    
+    @property
+    def lon_slice(self) -> slice:
+        return slice(self.minx, self.maxx)
+    
     def to_list(self, spec: str) -> list[int | float]:
         """Returns Bbox converted to list of numbers in different order
 
