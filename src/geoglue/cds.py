@@ -6,7 +6,6 @@ utilities to time-shift the data to a particular timezone
 from __future__ import annotations
 
 import json
-import calendar
 import datetime
 import logging
 import operator
@@ -46,12 +45,9 @@ CFGRIB_FILTER = {
 INSTANT_AGG = ["mean", "min", "max"]
 Reducer = Literal["mean", "min", "max", "sum"]
 
-LAST_DAY = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-
 
 def is_end_of_month(d: datetime.date) -> bool:
-    leap_offset = int(calendar.isleap(d.year)) if d.month == 2 else 0
-    return d == datetime.date(d.year, d.month, LAST_DAY[d.month - 1] + leap_offset)
+    return (d + datetime.timedelta(days=1)).day == 1
 
 
 def _is_hourly(ds: xr.Dataset, time_dim: str = "valid_time") -> bool:
@@ -418,6 +414,13 @@ def grib_to_netcdf(file: Path, path: Path | None = None) -> CdsPath:
     return CdsPath(**paths)
 
 
+def get_latest_era5_date() -> datetime.date:
+    """Gets latest date when ERA5 data is available
+
+    ERA5 releases data with a lag of 5 days"""
+    return datetime.datetime.today().date() - datetime.timedelta(days=6)
+
+
 class ReanalysisSingleLevels:
     """Fetch ERA5 reanalysis data from cdsapi for a particular country
 
@@ -492,7 +495,7 @@ class ReanalysisSingleLevels:
             raise ValueError(f"Invalid days supplied in {days}")
 
         data_format = data_format or self.data_format
-        cur_year = datetime.datetime.now().year
+        cur_year = datetime.datetime.today().year
         download_format = "unarchived" if data_format == "grib" else "zip"
         if year < 1940 or year > cur_year:
             raise ValueError(
@@ -524,17 +527,17 @@ class ReanalysisSingleLevels:
         chunks: list[CdsPath] = []
         cur = datetime.datetime.today().date()
         if start_date > end_date:
-            raise ValueError(f"Improper date range, {start_date=}, {end_date}")
+            raise ValueError(f"Improper date range: {start_date} -- {end_date}")
         if start_date.year != cur.year or end_date.year != cur.year:
             raise ValueError("""get_current_year() should only be used for dates in the current year
         for monthly downloads. To download an entire year at once, use get()""")
         if start_date > cur:
-            raise ValueError(f"Date in future: {start_date=}")
+            raise ValueError(f"Date in future: {start_date}")
         if end_date > cur:
-            raise ValueError(f"Date in future: {end_date=}")
+            raise ValueError(f"Date in future: {end_date}")
 
         # ERA5 releases data with a lag of 5 days, so offset by 6
-        last_date_available = cur - datetime.timedelta(days=6)
+        last_date_available = get_latest_era5_date()
         if end_date > last_date_available:
             warnings.warn(
                 f"Last day ERA5 data is available for is {last_date_available}"
@@ -565,7 +568,8 @@ class ReanalysisSingleLevels:
         request_months.sort()
         month_str = ",".join(map(str, request_months))
         scratch_file = (
-            geoglue.cache_path / f"{self.name_without_admin}-{month_str}-era5.grib"
+            geoglue.cache_path
+            / f"{self.name_without_admin}-{cur.year}-{month_str}-era5.grib"
         )
         if request_months and (not scratch_file.exists() or not skip_exists):
             request = self._cdsapi_request(cur.year, request_months, data_format="grib")
@@ -576,7 +580,9 @@ class ReanalysisSingleLevels:
             # Process downloaded file and chunk into monthly with the last chunk
             # being marked with _part. The last chunk will always be overwritten on
             # fresh request for the same month; whole months will not be redownloaded
-            chunks.extend(chunk_months(grib_to_netcdf(scratch_file), "era5", self.path))
+            chunks.extend(
+                chunk_months(grib_to_netcdf(scratch_file), self.stub, self.path)
+            )
 
         # Always download current month to overwrite existing data
         partial_file = (
@@ -654,7 +660,7 @@ class ReanalysisSingleLevels:
                 f"Can't perform timeshift for fractional timezone offset: {self.timezone_offset}"
             )
         return DatasetPool(
-            self.path.glob(f"{self.name_without_admin}-????-{self.stub}.*.nc"),
+            self.path.glob(f"{self.name_without_admin}-????-*{self.stub}.*.nc"),
             shift_hours=hours,
         )
 
@@ -676,9 +682,14 @@ class DatasetPool:
         self.paths = list(paths)
 
         regex = re.compile(r"^([A-Z]{3})-(\d{4})-(.*?)\.(instant|accum)\.nc$")
+        part_regex = re.compile(
+            r"^([A-Z]{3})-(\d{4}-0\d|1[0-2])(_part)?-(.*?)\.(instant|accum)\.nc$"
+        )
         # check that all files have the same stub
         matches = [regex.match(f.name) for f in self.paths]
+        part_matches = [part_regex.match(f.name) for f in self.paths]
         match_groups = [m.groups() for m in matches if m]
+        part_match_groups = [m.groups() for m in part_matches if m]
         parents = set(p.parent for p in self.paths)
         if len(parents) != 1:
             raise ValueError(
@@ -687,9 +698,14 @@ class DatasetPool:
         self.folder = self.paths[0].parent
         iso3 = set(map(operator.itemgetter(0), match_groups))
         stubs = set(map(operator.itemgetter(2), match_groups))
+        stubs = {x if "-" not in x else x.split("-")[-1] for x in stubs}
         self.years = [
             int(x) for x in sorted(set(map(operator.itemgetter(1), match_groups)))
         ]
+        cur_year = int(datetime.datetime.today().year)
+        if cur_year in self.years:
+            self.years.remove(cur_year)
+        self.part_chunks = sorted(set(map(operator.itemgetter(1), part_match_groups)))
         if len(stubs) > 1 or len(iso3) > 1:
             raise ValueError(
                 f"Multiple {iso3=} or {stubs=} not allowed in DatasetPool, specify a stricter path glob"
@@ -718,6 +734,83 @@ class DatasetPool:
             instant=self.folder / f"{self.iso3}-{year}-{self.stub}.instant.nc",
             accum=self.folder / f"{self.iso3}-{year}-{self.stub}.accum.nc",
         )
+
+    def get_current_year(
+        self, start_date: datetime.date | str, end_date: datetime.date | str
+    ) -> CdsDataset:
+        latest = get_latest_era5_date()
+        if isinstance(start_date, str):
+            start_date = datetime.date.fromisoformat(start_date)
+        if isinstance(end_date, str):
+            end_date = datetime.date.fromisoformat(end_date)
+
+        cur = datetime.datetime.today().date()
+        if not (cur.year == start_date.year == end_date.year):
+            raise ValueError("get_current_year() only works for the current year")
+        actual_start_date, actual_end_date = start_date, end_date
+
+        # Shift start and end date to account for timeshift
+        if self.shift_hours > 0:
+            actual_start_date = start_date - datetime.timedelta(days=1)
+        else:
+            actual_end_date = end_date + datetime.timedelta(days=1)
+        start_month, end_month = actual_start_date.month, actual_end_date.month
+        month_strs = [
+            f"{m:02d}{'_part' if m == latest.month else ''}"
+            for m in range(start_month, end_month + 1)
+        ]
+        required_files = [
+            CdsPath(
+                self.folder / f"{self.iso3}-{cur.year}-{m}-{self.stub}.instant.nc",
+                self.folder / f"{self.iso3}-{cur.year}-{m}-{self.stub}.accum.nc",
+            )
+            for m in month_strs
+        ]
+        if not all(r.exists() for r in required_files):
+            raise ValueError(
+                "CdsPath does not exist, run ReanalysisSingleLevels.get_current_year() to fetch"
+            )
+        ds = required_files.pop(0).as_dataset()
+        time_dim = ds.get_time_dim()
+
+        for r in required_files:
+            ds = concat(ds, r.as_dataset(), time_dim)
+
+        # ds0 corresponds to the time slice if there was no time shift
+        ds0 = ds.sel({time_dim: slice(start_date.isoformat(), end_date.isoformat())})
+        if self.shift_hours > 0:
+            patch_slice = slice(
+                actual_start_date.isoformat(), actual_start_date.isoformat() + "T23:00"
+            )
+            patch = ds.sel({time_dim: patch_slice})
+            shifted_ds = timeshift_hours_cdsdataset(
+                patch, ds0, self.shift_hours, time_dim
+            )
+            check_shifted_patch = shifted_ds.instant.isel(
+                {time_dim: slice(0, self.shift_hours)}
+            ).drop_vars(time_dim)
+            patch_without_time = patch.instant.isel(
+                {time_dim: slice(-self.shift_hours, None)}
+            ).drop_vars(time_dim)
+            assert check_shifted_patch.equals(patch_without_time)
+        else:
+            patch_slice = slice(
+                actual_end_date.isoformat(), actual_end_date.isoformat() + "T23:00"
+            )
+            patch = ds.sel({time_dim: patch_slice})
+            shifted_ds = timeshift_hours_cdsdataset(
+                ds0, patch, self.shift_hours, time_dim
+            )
+            # shift_hours is negative so invert signs
+            check_shifted_patch = shifted_ds.instant.isel(
+                {time_dim: slice(self.shift_hours, None)}
+            ).drop_vars(time_dim)
+            patch_without_time = patch.instant.isel(
+                {time_dim: slice(0, -self.shift_hours)}
+            ).drop_vars(time_dim)
+            assert check_shifted_patch.equals(patch_without_time)
+
+        return shifted_ds
 
     def __getitem__(self, year: int) -> CdsDataset:
         "Returns hourly dataset for a particular year, time-shifted to local timezone"
