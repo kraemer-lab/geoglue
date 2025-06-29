@@ -719,6 +719,80 @@ class DatasetPool:
             accum=self.folder / f"{self.iso3}-{year}-{self.stub}.accum.nc",
         )
 
+    def get_current_year(
+        self, start_date: datetime.date | str, end_date: datetime.date | str
+    ) -> CdsDataset:
+        if isinstance(start_date, str):
+            start_date = datetime.date.fromisoformat(start_date)
+        if isinstance(end_date, str):
+            end_date = datetime.date.fromisoformat(end_date)
+
+        cur = datetime.datetime.today().date()
+        if not (cur.year == start_date.year == end_date.year):
+            raise ValueError("get_current_year() only works for the current year")
+        actual_start_date, actual_end_date = start_date, end_date
+
+        # Shift start and end date to account for timeshift
+        if self.shift_hours > 0:
+            actual_start_date = start_date - datetime.timedelta(days=1)
+        else:
+            actual_end_date = end_date + datetime.timedelta(days=1)
+        start_month, end_month = actual_start_date.month, actual_end_date.month
+        month_strs = [f"{m:02d}" for m in range(start_month, end_month + 1)]
+        if end_month == cur.month:
+            month_strs[-1] += "_part"
+        required_files = [
+            CdsPath(
+                self.folder / f"{self.iso3}-{cur.year}-{m}-{self.stub}.instant.nc",
+                self.folder / f"{self.iso3}-{cur.year}-{m}-{self.stub}.accum.nc",
+            )
+            for m in month_strs
+        ]
+        if not all(r.exists() for r in required_files):
+            raise ValueError(
+                "CdsPath does not exist, run ReanalysisSingleLevels.get_current_year() to fetch"
+            )
+        ds = required_files.pop(0).as_dataset()
+        time_dim = ds.get_time_dim()
+
+        for r in required_files:
+            ds = concat(ds, r.as_dataset(), time_dim)
+
+        # ds0 corresponds to the time slice if there was no time shift
+        ds0 = ds.sel({time_dim: slice(start_date.isoformat(), end_date.isoformat())})
+        if self.shift_hours > 0:
+            patch_slice = slice(
+                actual_start_date.isoformat(), actual_start_date.isoformat() + "T23:00"
+            )
+            patch = ds.sel({time_dim: patch_slice})
+            shifted_ds = timeshift_hours_cdsdataset(
+                patch, ds0, self.shift_hours, time_dim
+            )
+            check_shifted_patch = shifted_ds.instant.isel(
+                {time_dim: slice(0, self.shift_hours)}
+            ).drop_vars(time_dim)
+            patch_without_time = patch.instant.isel(
+                {time_dim: slice(-self.shift_hours, None)}
+            ).drop_vars(time_dim)
+            assert check_shifted_patch.equals(patch_without_time)
+        else:
+            patch_slice = slice(
+                actual_end_date.isoformat(), actual_end_date.isoformat() + "T23:00"
+            )
+            patch = ds.sel({time_dim: patch_slice})
+            shifted_ds = timeshift_hours_cdsdataset(
+                ds0, patch, self.shift_hours, time_dim
+            )
+            check_shifted_patch = shifted_ds.instant.isel(
+                {time_dim: slice(-self.shift_hours, None)}
+            ).drop_vars(time_dim)
+            patch_without_time = patch.instant.isel(
+                {time_dim: slice(0, self.shift_hours)}
+            ).drop_vars(time_dim)
+            assert check_shifted_patch.equals(patch_without_time)
+
+        return shifted_ds
+
     def __getitem__(self, year: int) -> CdsDataset:
         "Returns hourly dataset for a particular year, time-shifted to local timezone"
         if year not in self.years:
