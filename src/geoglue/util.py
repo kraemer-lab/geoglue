@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
 
+
 def get_first_monday(year: int) -> datetime.date:
     "Gets first Monday of the year"
     return datetime.datetime.strptime(f"{year}-W01-1", "%Y-W%W-%u").date()
