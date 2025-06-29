@@ -377,7 +377,9 @@ class MemoryRaster:
         "Crop a MemoryRaster to bounds"
         # Check that bbox to crop to is enclosed within present bbox
         if not bbox < self.bbox:
-            raise ValueError(f"crop(): provided {bbox!r} not contained in raster {self.bbox!r}")
+            raise ValueError(
+                f"crop(): provided {bbox!r} not contained in raster {self.bbox!r}"
+            )
         return self.mask([bbox.as_polygon()])
 
     def plot(self, cmap: str = DEFAULT_COLORMAP, fill_nodata=None, **kwargs):
