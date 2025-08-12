@@ -80,7 +80,7 @@ class Bbox(NamedTuple):
 
     def coverage_fraction(self, other: Bbox) -> float:
         if self.__ge__(other):
-            return 100
+            return 1.0
         else:
             self.overlap_fraction(other)
 
