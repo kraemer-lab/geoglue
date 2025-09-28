@@ -7,10 +7,9 @@ calculating extents or geospatial bounds, and calculating timezone offsets.
 
 from __future__ import annotations
 
-import shlex
 import logging
 import datetime
-from typing import NamedTuple
+from typing import NamedTuple, Mapping
 from pathlib import Path
 
 import pytz
@@ -39,11 +38,15 @@ class Region(NamedTuple):
     name: str
     "Region identifier without spaces"
 
-    path: str | Path
-    "Path to shapefile"
+    admin_files: Mapping[int, str | Path]
+    "Path to shapefiles, indexed by administrative level"
 
-    pk: str
-    "Column ID that is used as primary key to identify regions in shapefile"
+    pk: dict[int, str] | str
+    """Column ID that is used as primary key to identify regions
+    in shapefile, indexed by administrative level.
+
+    If str, is the same for every administrative level
+    """
 
     tz: str
     """Timezone offset from UTC.
@@ -62,27 +65,18 @@ class Region(NamedTuple):
             [
                 self.name,
                 str(self.bbox),
-                shlex.quote(self.pk),
                 self.tz,
-                shlex.quote(str(self.path)),
                 self.url,
             ]
         )
 
-    @staticmethod
-    def from_string(s: str) -> Region:
-        vals = shlex.split(s)
-        name = vals.pop(0)
-        bbox = Bbox.from_string(vals.pop(0))
-        pk = vals.pop(0)
-        tz = vals.pop(0)
-        path = Path(vals.pop(0))
-        url = vals.pop(0) if vals else "http://unknown"
-        return Region(name, path, pk, tz, url, bbox)
-
-    def read(self) -> gpd.GeoDataFrame:
+    def read(self, admin: int) -> gpd.GeoDataFrame:
         "Reads a region shapefile"
-        df = gpd.read_file(self.path)
+        if admin not in self.admin_files:
+            raise KeyError(
+                f"Administrative level {admin} shapefile not defined for {self.name!r}"
+            )
+        df = gpd.read_file(self.admin_files[admin])
         # drop shapeISO column which is just None
         if "shapeISO" in df.columns:
             return df.drop(columns=["shapeISO"])  # type: ignore
@@ -142,7 +136,6 @@ def get_bbox(path: str | Path) -> Bbox:
 
 def gadm(
     iso3: str,
-    admin: int,
     localize_date: datetime.datetime = LOCALIZE_DATE,
     data_path: Path | None = None,
     tzoffset: str | None = None,
@@ -154,8 +147,6 @@ def gadm(
     ----------
     iso3 : str
         Country ISO3 code
-    admin : int
-        Admin level, one of 1, 2 or 3
     localize_date : datetime.datetime
         Date where timezone is localised to, default=2022-01-01.
         See :meth:`get_timezone()` for information about this parameter
@@ -174,8 +165,6 @@ def gadm(
         Region data representing GADM information for a country at a
         particular admin level
     """
-    if admin not in [1, 2, 3]:
-        raise ValueError("Unsupported administrative level, must be one of 1-3")
     data_path = data_path or geoglue.data_path
     url = f"https://geodata.ucdavis.edu/gadm/gadm4.1/shp/gadm41_{iso3}_shp.zip"
     path_geodata = data_path / iso3 / "gadm41"
@@ -192,17 +181,23 @@ def gadm(
                 "GADM data download failed %s -> %s", url, path_geodata
             )
         logger.info("GADM data downloaded to %s", path_geodata)
-    path = path_geodata / f"gadm41_{iso3}_{admin}.shp"
+    admins = {
+        int(path.stem.split("_")[-1]): path for path in path_geodata.glob("*.shp")
+    }
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
     return Region(
-        f"gadm:{iso3}-{admin}", path, f"GID_{admin}", tzoffset, url, get_bbox(path)
+        f"gadm:{iso3}",
+        admins,
+        {i: f"GID_{i}" for i in admins},
+        tzoffset,
+        url,
+        get_bbox(admins[1]),
     )
 
 
 def geoboundaries(
     iso3: str,
-    admin: int,
     localize_date: datetime.datetime = LOCALIZE_DATE,
     data_path: Path | None = None,
     tzoffset: str | None = None,
@@ -214,8 +209,6 @@ def geoboundaries(
     ----------
     iso3 : str
         Country ISO3 code
-    admin : int
-        Admin level, one of 1, 2
     localize_date : datetime.datetime
         Date where timezone is localised to, default=2022-01-01.
         See :meth:`get_timezone()` for information about this parameter
@@ -234,8 +227,6 @@ def geoboundaries(
         Region data representing geoBoundaries information for a country at a
         particular admin level
     """
-    if admin not in [1, 2]:
-        raise ValueError("Unsupported administrative level, must be one of 1-2")
     data_path = data_path or geoglue.data_path
     url = f"https://www.geoboundaries.org/api/current/gbOpen/{iso3}/"
     path_geodata = data_path / iso3 / "geoboundaries"
@@ -243,8 +234,12 @@ def geoboundaries(
     manifest = [
         path_geodata / f"geoboundaries_{iso3}_ADM{admin}.{ext}"
         for ext in GEOBOUNDARIES_EXT
+        for admin in [1, 2]
     ]
-    if not all(f.exists() for f in manifest):
+    for f in manifest:
+        if f.exists():
+            continue
+        admin = int(f.stem.split("_")[-1][3:])
         logger.info("Missing geoBoundaries data for %s, downloading data", iso3)
         if not download_file(
             _geoboundaries_shapefile_url(url, adm=admin), path_geodata
@@ -254,7 +249,7 @@ def geoboundaries(
                 _geoboundaries_shapefile_url(url, adm=admin),
             )
         logger.info("geoBoundaries data downloaded to %s", path_geodata)
-    path = path_geodata / f"geoBoundaries-{iso3}-ADM{admin}.shp"
+    admins = {i: path_geodata / f"geoBoundaries-{iso3}-ADM{i}.shp" for i in [1, 2]}
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
-    return Region(f"gb:{iso3}-{admin}", path, "shapeID", tzoffset, url, get_bbox(path))
+    return Region(f"gb:{iso3}", admins, "shapeID", tzoffset, url, get_bbox(admins[1]))
