@@ -15,7 +15,7 @@ ADMIN2_N = 706
 
 @pytest.fixture(scope="module")
 def vnm_geoboundaries_admin2():
-    df = geoboundaries("VNM", 2, data_path=DATA_PATH).read()
+    df = geoboundaries("VNM", data_path=DATA_PATH).read(2)
 
     # We use era5_extents which use admin0 boundaries. In geoBoundaries data,
     # the admin0 total_bounds are smaller than the admin2 total bounds which
