@@ -7,9 +7,10 @@ calculating extents or geospatial bounds, and calculating timezone offsets.
 
 from __future__ import annotations
 
+import re
 import logging
 import datetime
-from typing import NamedTuple, Mapping
+from typing import NamedTuple, Mapping, Literal
 from pathlib import Path
 
 import pytz
@@ -17,6 +18,7 @@ import pycountry
 import requests
 import geopandas as gpd
 
+import tomli as toml
 import geoglue
 
 from .util import download_file
@@ -253,3 +255,60 @@ def geoboundaries(
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
     return Region(f"gb:{iso3}", admins, "shapeID", tzoffset, url, get_bbox(admins[1]))
+
+
+def get_region(
+    name: str,
+    file: str | Path | None = None,
+    fallback: Literal["gadm", "geoboundaries"] = "gadm",
+    **kwargs,
+) -> Region:
+    """Returns region from file or fallback to GADM or geoBoundaries
+
+    Parameters
+    ----------
+    name : str
+        Name of the region, e.g. 'VNM', 'HCMC'
+    file : str | Path | None
+        TOML file from which regions should be read. If not specified,
+        fallback to GADM or geoBoundaries
+    fallback : Literal["gadm", "geoboundaries"]
+        Default fallback provider, used when file is not specified or
+        region name not found in the TOML file
+    **kwargs
+        Extra parameters passed to :meth:`gadm` or :meth:`geoboundaries`
+
+    Returns
+    -------
+    Region
+    """
+    if file is not None and Path(file).exists():
+        data = toml.loads(Path(file).read_text())
+    else:
+        data = {}
+    if name not in data:
+        # fallback to gadm or geoboundaries
+        match fallback:
+            case "gadm":
+                return gadm(name, **kwargs)
+            case "geoboundaries":
+                return geoboundaries(name, **kwargs)
+    region_dict = data[name]
+    admin_files = {int(k): Path(v) for k, v in region_dict["admin_files"].items()}
+    if isinstance(region_dict["pk"], dict):
+        pk = {int(k): v for k, v in region_dict["pk"].items()}
+    else:
+        pk = region_dict["pk"]
+
+    tz = region_dict["tz"]
+    if not re.match(r"[+-][01]\d:([03]0|45)", tz):
+        raise ValueError(f"Invalid timezone in region {name}: {tz}")
+    if not (url := region_dict["url"]).startswith("https://"):
+        raise ValueError(f"Invalid URL in region {name}: {url}")
+    minx, miny, maxx, maxy = region_dict["bbox"]
+    if not (-180 <= minx < maxx <= 180 and -90 <= miny < maxy <= 90):
+        raise ValueError(
+            f"Invalid bounds for region {name}: {minx},{miny},{maxx},{maxy}"
+        )
+    bbox = Bbox(minx, miny, maxx, maxy)
+    return Region(name, admin_files, pk, tz, url, bbox)

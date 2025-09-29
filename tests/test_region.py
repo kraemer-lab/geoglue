@@ -6,18 +6,13 @@ import numpy as np
 from unittest.mock import patch
 
 from geoglue.memoryraster import MemoryRaster
-from geoglue.region import (
-    gadm,
-    geoboundaries,
-    get_timezone,
-    Region,
-)
+from geoglue.region import gadm, geoboundaries, get_timezone, Region, get_region
 from geoglue.types import Bbox
 
 DATA_PATH = Path("data")
-
+REGION_FILE = Path("tests/data/regions.toml")
 EXAMPLE_REGION = Region(
-    "gb:VNM-2",
+    "gb:VNM",
     {2: Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp")},
     {2: "shapeID"},
     "+07:00",
@@ -31,7 +26,7 @@ EXAMPLE_REGION = Region(
 )
 
 EXAMPLE_REGION_STRING = (
-    "gb:VNM-2 102,7,118,24 +07:00 https://www.geoboundaries.org/api/current/gbOpen/VNM/"
+    "gb:VNM 102,7,118,24 +07:00 https://www.geoboundaries.org/api/current/gbOpen/VNM/"
 )
 
 
@@ -108,3 +103,13 @@ def test_bounds(region_geoboundaries):
     expected_bounds = np.array([102.14588283, 8.43995763, 114.99696468, 23.3909745])
     actual_bounds = np.array(region_geoboundaries.bbox)
     assert np.allclose(actual_bounds, expected_bounds)
+
+
+def test_valid_get_region():
+    assert get_region("gb:VNM", REGION_FILE) == EXAMPLE_REGION
+
+
+@pytest.mark.parametrize("region", ["invalid_tz", "invalid_bounds"])
+def test_invalid_get_region(region):
+    with pytest.raises(ValueError):
+        get_region(region, REGION_FILE)
