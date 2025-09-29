@@ -1,0 +1,21 @@
+["gb:VNM"]
+admin_files = {2 = "data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp"}
+pk = {2 = "shapeID"}
+tz = "+07:00"
+url = "https://www.geoboundaries.org/api/current/gbOpen/VNM/"
+bbox = [102,7,118,24]
+
+[invalid_tz]
+admin_files = {2 = "/here/example/invalid-tz.shp"}
+pk = "shapeID"
+tz = "+07:50"
+url = "https://example.com"
+bbox = [102,7,118,24]
+
+
+[invalid_bounds]
+admin_files = {2 = "/here/example/invalid-tz.shp"}
+pk = "shapeID"
+tz = "+07:00"
+url = "https://example.com"
+bbox = [102,7,190,24]
