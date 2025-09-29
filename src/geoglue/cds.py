@@ -755,21 +755,35 @@ class DatasetPool:
         else:
             actual_end_date = end_date + datetime.timedelta(days=1)
         start_month, end_month = actual_start_date.month, actual_end_date.month
-        month_strs = [
+        required_months = [
             f"{m:02d}{'_part' if m == latest.month else ''}"
             for m in range(start_month, end_month + 1)
         ]
+
+        def extract_month(f):
+            mo = f.stem.split("-")[2]
+            if mo.startswith("1") or mo.startswith("0"):
+                return mo
+            return None
+
+        months = sorted(filter(None, set(map(extract_month, self.folder.glob("*.nc")))))
+        existing_months = [
+            m
+            for m in months
+            if m in required_months or m.replace("_part", "") in required_months
+        ]
+        if len(existing_months) != len(required_months):
+            raise ValueError(
+                "Required months do not exist, run ReanalysisSingleLevels.get_current_year() to fetch: "
+                f"{set(required_months) - set(existing_months)}"
+            )
         required_files = [
             CdsPath(
                 self.folder / f"{self.iso3}-{cur.year}-{m}-{self.stub}.instant.nc",
                 self.folder / f"{self.iso3}-{cur.year}-{m}-{self.stub}.accum.nc",
             )
-            for m in month_strs
+            for m in existing_months
         ]
-        if not all(r.exists() for r in required_files):
-            raise ValueError(
-                "CdsPath does not exist, run ReanalysisSingleLevels.get_current_year() to fetch"
-            )
         ds = required_files.pop(0).as_dataset()
         time_dim = ds.get_time_dim()
 
