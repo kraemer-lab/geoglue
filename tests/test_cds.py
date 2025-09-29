@@ -20,8 +20,8 @@ from geoglue.region import Region
 from geoglue.types import Bbox
 
 BRB = Region(
-    "BRB-1",
-    "/path/to/BRB.shp",
+    "BRB",
+    {1: "/path/to/BRB.shp"},
     "GID_1",
     "-04:00",
     "https://gadm.org",
@@ -29,8 +29,8 @@ BRB = Region(
 )
 
 SGP = Region(
-    "SGP-1",
-    "/path/to/SGP.shp",
+    "SGP",
+    {1: "/path/to/SGP.shp"},
     "GID_1",
     "+08:00",
     "https://gadm.org",
@@ -39,7 +39,7 @@ SGP = Region(
 
 NPL = Region(
     "NPL-1",
-    "/path/to/NPL.shp",
+    {1: "/path/to/NPL.shp"},
     "GID_1",
     "+05:45",
     "https://gadm.org",
