@@ -101,7 +101,7 @@ def test_worldpop_1km(year, population):
 
 
 def test_read_shapefiles(region_geoboundaries):
-    assert {"shapeID", "shapeName"} <= set(region_geoboundaries.read(1).columns)
+    assert {"shapeID", "shapeName"} <= set(region_geoboundaries.read_admin(1).columns)
 
 
 def test_bounds(region_geoboundaries):

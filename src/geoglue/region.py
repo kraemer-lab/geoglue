@@ -70,7 +70,7 @@ class Region(NamedTuple):
             ]
         )
 
-    def read(self, admin: int) -> gpd.GeoDataFrame:
+    def read_admin(self, admin: int) -> gpd.GeoDataFrame:
         "Reads a region shapefile"
         if admin not in self.admin_files:
             raise KeyError(
