@@ -23,8 +23,24 @@ EXAMPLE_REGION = Region(
         miny=7,
         maxx=118,
     ),
+    None,
 )
 
+
+EXAMPLE_REGION_WITH_ADMIN = Region(
+    "gb:VNM",
+    {2: Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp")},
+    {2: "shapeID"},
+    "+07:00",
+    "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
+    Bbox(
+        maxy=24,
+        minx=102,
+        miny=7,
+        maxx=118,
+    ),
+    2,
+)
 EXAMPLE_REGION_STRING = (
     "gb:VNM 102,7,118,24 +07:00 https://www.geoboundaries.org/api/current/gbOpen/VNM/"
 )
@@ -105,8 +121,12 @@ def test_bounds(region_geoboundaries):
     assert np.allclose(actual_bounds, expected_bounds)
 
 
-def test_valid_get_region():
-    assert get_region("gb:VNM", REGION_FILE) == EXAMPLE_REGION
+@pytest.mark.parametrize(
+    "region_name,region",
+    [("gb:VNM", EXAMPLE_REGION), ("gb:VNM-2", EXAMPLE_REGION_WITH_ADMIN)],
+)
+def test_valid_get_region(region_name, region):
+    assert get_region(region_name, REGION_FILE) == region
 
 
 @pytest.mark.parametrize("region", ["invalid_tz", "invalid_bounds"])
