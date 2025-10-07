@@ -6,43 +6,42 @@ import numpy as np
 from unittest.mock import patch
 
 from geoglue.memoryraster import MemoryRaster
-from geoglue.region import gadm, geoboundaries, get_timezone, Region, get_region
+from geoglue.region import (
+    CountryAdministrativeLevel,
+    gadm,
+    geoboundaries,
+    get_timezone,
+    Country,
+    get_region,
+)
 from geoglue.types import Bbox
 
-DATA_PATH = Path("data")
+DATA_PATH = Path.home() / ".local/share/geoglue"
 REGION_FILE = Path("tests/data/regions.toml")
-EXAMPLE_REGION = Region(
-    "gb:VNM",
-    {2: Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp")},
-    {2: "shapeID"},
+
+BBOX = Bbox(
+    maxy=23.39097449667571,
+    minx=102.14588283092797,
+    miny=8.43995762984082,
+    maxx=114.99696468067555,
+)
+
+EXAMPLE_REGION = Country(
+    "VNM",
+    {
+        1: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp",
+        2: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp",
+    },
+    "shapeID",
     "+07:00",
     "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
-    Bbox(
-        maxy=24,
-        minx=102,
-        miny=7,
-        maxx=118,
-    ),
-    None,
+    BBOX,
 )
 
 
-EXAMPLE_REGION_WITH_ADMIN = Region(
-    "gb:VNM",
-    {2: Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp")},
-    {2: "shapeID"},
-    "+07:00",
-    "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
-    Bbox(
-        maxy=24,
-        minx=102,
-        miny=7,
-        maxx=118,
-    ),
-    2,
-)
 EXAMPLE_REGION_STRING = (
-    "gb:VNM 102,7,118,24 +07:00 https://www.geoboundaries.org/api/current/gbOpen/VNM/"
+    "VNM 102.14588283092797,8.43995762984082,114.99696468067555,23.39097449667571 "
+    "+07:00 https://www.geoboundaries.org/api/current/gbOpen/VNM/"
 )
 
 
@@ -62,27 +61,12 @@ def region_gadm(_):
 
 
 def test_region_geoboundaries(region_geoboundaries):
-    assert region_geoboundaries == Region(
-        "gb:VNM",
-        {
-            1: Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp"),
-            2: Path("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp"),
-        },
-        "shapeID",
-        "+07:00",
-        "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
-        Bbox(
-            maxy=23.39097449667571,
-            minx=102.14588283092797,
-            miny=8.43995762984082,
-            maxx=114.99696468067555,
-        ),
-    )
+    assert region_geoboundaries == EXAMPLE_REGION
 
 
 def test_region_gadm(region_gadm):
-    assert region_gadm == Region(
-        "gadm:VNM",
+    assert region_gadm == Country(
+        "VNM",
         {
             i: Path.home() / f".local/share/geoglue/VNM/gadm41/gadm41_VNM_{i}.shp"
             for i in range(4)
@@ -121,12 +105,23 @@ def test_bounds(region_geoboundaries):
     assert np.allclose(actual_bounds, expected_bounds)
 
 
+def test_get_admin():
+    assert EXAMPLE_REGION.admin(1) == CountryAdministrativeLevel(
+        "VNM",
+        1,
+        DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp",
+        "shapeID",
+        "+07:00",
+        BBOX,
+    )
+
+
 @pytest.mark.parametrize(
     "region_name,region",
-    [("gb:VNM", EXAMPLE_REGION), ("gb:VNM-2", EXAMPLE_REGION_WITH_ADMIN)],
+    [("VNM", EXAMPLE_REGION), ("VNM-2", EXAMPLE_REGION)],
 )
 def test_valid_get_region(region_name, region):
-    assert get_region(region_name, REGION_FILE) == region
+    assert get_region(region_name, REGION_FILE, fallback="geoboundaries") == region
 
 
 @pytest.mark.parametrize("region", ["invalid_tz", "invalid_bounds"])
