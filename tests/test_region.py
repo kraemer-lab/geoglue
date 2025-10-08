@@ -28,14 +28,15 @@ BBOX = Bbox(
 
 EXAMPLE_REGION = Country(
     "VNM",
+    "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
+    BBOX,
+    "VNM",
+    "+07:00",
     {
         1: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp",
         2: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp",
     },
     "shapeID",
-    "+07:00",
-    "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
-    BBOX,
 )
 
 
@@ -67,12 +68,6 @@ def test_region_geoboundaries(region_geoboundaries):
 def test_region_gadm(region_gadm):
     assert region_gadm == Country(
         "VNM",
-        {
-            i: Path.home() / f".local/share/geoglue/VNM/gadm41/gadm41_VNM_{i}.shp"
-            for i in range(4)
-        },
-        {i: f"GID_{i}" for i in range(4)},
-        "+07:00",
         "https://geodata.ucdavis.edu/gadm/gadm4.1/shp/gadm41_VNM_shp.zip",
         Bbox(
             maxy=23.39269256700004,
@@ -80,6 +75,13 @@ def test_region_gadm(region_gadm):
             miny=8.381355000000099,
             maxx=109.46917000000008,
         ),
+        "VNM",
+        "+07:00",
+        {
+            i: Path.home() / f".local/share/geoglue/VNM/gadm41/gadm41_VNM_{i}.shp"
+            for i in range(4)
+        },
+        {i: f"GID_{i}" for i in range(4)},
     )
 
 
@@ -108,11 +110,13 @@ def test_bounds(region_geoboundaries):
 def test_get_admin():
     assert EXAMPLE_REGION.admin(1) == CountryAdministrativeLevel(
         "VNM",
+        "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
+        BBOX,
+        "VNM",
+        "+07:00",
         1,
         DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp",
         "shapeID",
-        "+07:00",
-        BBOX,
     )
 
 

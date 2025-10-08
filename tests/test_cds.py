@@ -16,36 +16,40 @@ from geoglue.cds import (
     DatasetPool,
     grib_to_netcdf,
 )
-from geoglue.region import Region
+from geoglue.region import Country, CountryAdministrativeLevel
 from geoglue.types import Bbox
 
-BRB = Region(
+BRB = Country(
     "BRB",
-    {1: "/path/to/BRB.shp"},
-    "GID_1",
-    "-04:00",
     "https://gadm.org",
     Bbox(maxy=14, minx=-59, miny=13, maxx=-58),
+    "BRB",
+    "-04:00",
+    {1: "/path/to/BRB.shp"},
+    "GID_1",
 )
 
-SGP = Region(
+SGP = Country(
     "SGP",
-    {1: "/path/to/SGP.shp"},
-    "GID_1",
-    "+08:00",
     "https://gadm.org",
     Bbox(maxy=2, minx=103, miny=1, maxx=105),
+    "SGP",
+    "+08:00",
+    {1: "/path/to/SGP.shp"},
+    {1: "GID_1"},
 )
 
-NPL = Region(
-    "NPL-1",
-    {1: "/path/to/NPL.shp"},
-    "GID_1",
-    "+05:45",
+NPL = CountryAdministrativeLevel(
+    "NPL",
     "https://gadm.org",
     Bbox(
         minx=80.0884245137, miny=26.3978980576, maxx=88.1748043151, maxy=30.4227169866
     ),
+    "NPL",
+    "+05:45",
+    admin=1,
+    admin_file="/path/to/NPL.shp",
+    pk="GID_1",
 )
 
 
