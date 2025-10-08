@@ -54,6 +54,22 @@ class BaseRegion:
     iso3: str | None
     "If specified, the ISO3 code of the country that the region is a subdivision of"
 
+    def __post_init__(self):
+        if self.iso3 and self.iso3 not in VALID_ISO3:
+            raise ValueError(f"Not a valid ISO3 code: {self.iso3}")
+
+
+@dataclass(frozen=True)
+class BaseCountry(BaseRegion):
+    "Base class for all country level classes"
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.name != self.iso3:
+            raise ValueError(
+                f"All Country objects must have name == iso3, got name={self.name!r}, iso3={self.iso3!r}"
+            )
+
 
 @dataclass(frozen=True)
 class ZonedBaseRegion(BaseRegion):
@@ -138,12 +154,8 @@ class AdministrativeLevel(ZonedBaseRegion):
 
 
 @dataclass(frozen=True)
-class Country(Region):
+class Country(Region, BaseCountry):
     "Subclass of Region that restricts name to country ISO3 codes"
-
-    def __post_init__(self):
-        if self.name not in VALID_ISO3:
-            raise ValueError(f"Not a valid country ISO3 code: {self.name}")
 
     def admin(self, adm: int) -> CountryAdministrativeLevel:
         alevel = super().admin(adm)
@@ -151,12 +163,8 @@ class Country(Region):
 
 
 @dataclass(frozen=True)
-class CountryAdministrativeLevel(AdministrativeLevel):
+class CountryAdministrativeLevel(AdministrativeLevel, BaseCountry):
     "Subclass of AdministrativeLevel that restricts name to country ISO3 codes"
-
-    def __post_init__(self):
-        if self.name not in VALID_ISO3:
-            raise ValueError(f"Not a valid country ISO3 code: {self.name}")
 
 
 def get_timezone(iso3: str, localize_date: datetime.datetime) -> str | None:

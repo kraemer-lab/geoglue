@@ -46,6 +46,36 @@ EXAMPLE_REGION_STRING = (
 )
 
 
+def test_invalid_country_name_iso3_mismatch():
+    with pytest.raises(ValueError, match="All Country objects must have name == iso3"):
+        Country(
+            "HCMC",
+            "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
+            BBOX,
+            "VNM",
+            "+07:00",
+            {
+                1: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp",
+                2: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp",
+            },
+            "shapeID",
+        )
+
+
+def test_invalid_country_admin():
+    with pytest.raises(ValueError, match="All Country objects must have name == iso3"):
+        CountryAdministrativeLevel(
+            "HCMC",
+            "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
+            BBOX,
+            "VNM",
+            "+07:00",
+            1,
+            DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp",
+            "shapeID",
+        )
+
+
 def test_region_to_string():
     assert str(EXAMPLE_REGION) == EXAMPLE_REGION_STRING
 
