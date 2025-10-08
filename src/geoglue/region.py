@@ -7,6 +7,7 @@ calculating extents or geospatial bounds, and calculating timezone offsets.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 import logging
 import datetime
@@ -37,12 +38,37 @@ LOCALIZE_DATE = datetime.datetime(2022, 1, 1)
 VALID_ISO3 = [c.alpha_3 for c in pycountry.countries]  # type: ignore
 
 
-@dataclass
-class Region:
-    "Data representing a geospatial region"
+@dataclass(frozen=True)
+class BaseRegion:
+    "Base class for all regions containing common fields"
 
     name: str
     "Region identifier without spaces"
+
+    url: str
+    "URL from which data was downloaded"
+
+    bbox: Bbox
+    "Geospatial bounding box"
+
+    iso3: str | None
+    "If specified, the ISO3 code of the country that the region is a subdivision of"
+
+
+@dataclass(frozen=True)
+class ZonedBaseRegion(BaseRegion):
+    "Base class for all regions with a fixed time zone"
+
+    tz: str
+    """Timezone offset from UTC.
+
+    Expressed as [+-]HH:MM, e.g. +01:00 for CET timezone
+    """
+
+
+@dataclass(frozen=True)
+class Region(ZonedBaseRegion):
+    "Represents a geospatial region with a fixed time zone"
 
     admin_files: Mapping[int, str | Path]
     "Path to shapefiles, indexed by administrative level"
@@ -54,27 +80,12 @@ class Region:
     If str, is the same for every administrative level
     """
 
-    tz: str
-    """Timezone offset from UTC.
-
-    Expressed as [+-]HH:MM, e.g. +01:00 for CET timezone
-    """
-
-    url: str
-    "URL from which data was downloaded"
-
-    bbox: Bbox
-    "Geospatial bounding box"
-
-    iso3: str | None = None
-    "If specified, the ISO3 code of the country that the region is a subdivision of"
-
     def __str__(self) -> str:
         return " ".join(
             [
                 self.name,
                 str(self.bbox),
-                self.tz,
+                self.tz or "NA",
                 self.url,
             ]
         )
@@ -98,20 +109,19 @@ class Region:
             )
         return AdministrativeLevel(
             self.name,
+            self.url,
+            self.bbox,
+            self.iso3,
+            self.tz,
             adm,
             self.admin_files[adm],
             self.pk[adm] if isinstance(self.pk, dict) else self.pk,
-            self.tz,
-            iso3=self.iso3,
         )
 
 
-@dataclass
-class AdministrativeLevel:
+@dataclass(frozen=True)
+class AdministrativeLevel(ZonedBaseRegion):
     "Represents a specific administrative level"
-
-    name: str
-    "Region identifier without spaces"
 
     admin: int
     "Administrative level"
@@ -123,77 +133,30 @@ class AdministrativeLevel:
     """Column ID that is used as primary key to identify regions
     in shapefile, indexed by administrative level."""
 
-    tz: str
-    """Timezone offset from UTC.
-
-    Expressed as [+-]HH:MM, e.g. +01:00 for CET timezone
-    """
-
-    _bbox: Bbox | None = None
-    "Geospatial bounding box"
-
-    iso3: str | None = None
-    "If specified, the ISO3 code of the country that the region is a subdivision of"
-
-    @property
-    def bbox(self) -> Bbox:
-        if self._bbox is None:
-            return get_bbox(self.admin_file)
-        else:
-            return self._bbox
-
     def read(self) -> gpd.GeoDataFrame:
         return gpd.read_file(self.admin_file)
 
 
+@dataclass(frozen=True)
 class Country(Region):
     "Subclass of Region that restricts name to country ISO3 codes"
 
-    def __init__(
-        self,
-        name: str,
-        admin_files: Mapping[int, str | Path],
-        pk: dict[int, str] | str,
-        tz: str,
-        url: str,
-        bbox: Bbox,
-    ):
-        if name.upper() in VALID_ISO3:
-            self.name = name.upper()
-        else:
-            raise ValueError(f"Not a valid country ISO3: {name=}")
-        self.name = name
-        super().__init__(name, admin_files, pk, tz, url, bbox, iso3=name)
+    def __post_init__(self):
+        if self.name not in VALID_ISO3:
+            raise ValueError(f"Not a valid country ISO3 code: {self.name}")
 
     def admin(self, adm: int) -> CountryAdministrativeLevel:
         alevel = super().admin(adm)
-        return CountryAdministrativeLevel(
-            alevel.name,
-            alevel.admin,
-            alevel.admin_file,
-            alevel.pk,
-            alevel.tz,
-            alevel.bbox,
-        )
+        return CountryAdministrativeLevel(**dataclasses.asdict(alevel))
 
 
+@dataclass(frozen=True)
 class CountryAdministrativeLevel(AdministrativeLevel):
     "Subclass of AdministrativeLevel that restricts name to country ISO3 codes"
 
-    def __init__(
-        self,
-        name: str,
-        admin: int,
-        admin_file: str | Path,
-        pk: str,
-        tz: str,
-        bbox: Bbox | None = None,
-    ):
-        if name.upper() in VALID_ISO3:
-            self.name = name.upper()
-        else:
-            raise ValueError(f"Not a valid country ISO3: {name=}")
-        super().__init__(name, admin, admin_file, pk, tz, bbox, iso3=name)
+    def __post_init__(self):
+        if self.name not in VALID_ISO3:
+            raise ValueError(f"Not a valid country ISO3 code: {self.name}")
 
 
 def get_timezone(iso3: str, localize_date: datetime.datetime) -> str | None:
@@ -302,11 +265,12 @@ def gadm(
         raise ValueError("No unique timezone offset found or supplied")
     return Country(
         iso3,
-        admins,
-        {i: f"GID_{i}" for i in admins},
-        tzoffset,
         url,
         get_bbox(admins[1]),
+        iso3,
+        tzoffset,
+        admins,
+        {i: f"GID_{i}" for i in admins},
     )
 
 
@@ -361,7 +325,7 @@ def geoboundaries(
     admins = {i: path_geodata / f"geoBoundaries-{iso3}-ADM{i}.shp" for i in [1, 2]}
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
-    return Country(iso3, admins, "shapeID", tzoffset, url, get_bbox(admins[1]))
+    return Country(iso3, url, get_bbox(admins[1]), iso3, tzoffset, admins, "shapeID")
 
 
 def get_region(
