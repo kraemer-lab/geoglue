@@ -21,7 +21,7 @@ import pandas as pd
 import xarray as xr
 import geoglue
 
-from .region import Region
+from .region import ZonedBaseRegion
 from .util import find_unique_time_coord, get_first_monday
 
 logger = logging.getLogger(__name__)
@@ -444,7 +444,7 @@ class ReanalysisSingleLevels:
 
     def __init__(
         self,
-        region: Region,
+        region: ZonedBaseRegion,
         variables: list[str],
         path: Path | None = None,
         stub: str = "era5",
