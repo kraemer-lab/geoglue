@@ -19,10 +19,10 @@ import cdsapi
 import numpy as np
 import pandas as pd
 import xarray as xr
-import geoglue
 
 from .region import ZonedBaseRegion
 from .util import find_unique_time_coord, get_first_monday
+from .paths import geoglue_data_path, geoglue_cache_path
 
 logger = logging.getLogger(__name__)
 
@@ -464,7 +464,7 @@ class ReanalysisSingleLevels:
         # are same across administrative levels
         self.name_without_admin = self.name.split("-")[0]
         if not (
-            path := path or geoglue.data_path / self.name_without_admin / "era5"
+            path := path or geoglue_data_path / self.name_without_admin / "era5"
         ).exists():
             path.mkdir(parents=True)
         self.path = path
@@ -568,7 +568,7 @@ class ReanalysisSingleLevels:
         request_months.sort()
         month_str = ",".join(map(str, request_months))
         scratch_file = (
-            geoglue.cache_path
+            geoglue_cache_path
             / f"{self.name_without_admin}-{cur.year}-{month_str}-era5.grib"
         )
         if request_months and (not scratch_file.exists() or not skip_exists):

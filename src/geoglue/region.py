@@ -21,10 +21,10 @@ import requests
 import geopandas as gpd
 
 import tomli as toml
-import geoglue
 
 from .util import download_file
 from .types import Bbox
+from .paths import geoglue_data_path
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +221,7 @@ def get_bbox(path: str | Path) -> Bbox:
 def gadm(
     iso3: str,
     localize_date: datetime.datetime = LOCALIZE_DATE,
-    data_path: Path | None = None,
+    data_path: Path = geoglue_data_path,
     tzoffset: str | None = None,
 ) -> Country:
     """
@@ -250,7 +250,6 @@ def gadm(
         particular admin level
     """
     iso3 = iso3.upper()
-    data_path = data_path or geoglue.data_path
     url = f"https://geodata.ucdavis.edu/gadm/gadm4.1/shp/gadm41_{iso3}_shp.zip"
     path_geodata = data_path / iso3 / "gadm41"
     path_geodata.mkdir(parents=True, exist_ok=True)
@@ -285,7 +284,7 @@ def gadm(
 def geoboundaries(
     iso3: str,
     localize_date: datetime.datetime = LOCALIZE_DATE,
-    data_path: Path | None = None,
+    data_path: Path = geoglue_data_path,
     tzoffset: str | None = None,
 ) -> Region:
     """
@@ -314,7 +313,6 @@ def geoboundaries(
         particular admin level
     """
     iso3 = iso3.upper()
-    data_path = data_path or geoglue.data_path
     url = f"https://www.geoboundaries.org/api/current/gbOpen/{iso3}/"
     path_geodata = data_path / iso3 / "geoboundaries"
     path_geodata.mkdir(parents=True, exist_ok=True)
@@ -404,4 +402,4 @@ def get_region(
     bbox = Bbox(minx, miny, maxx, maxy)
     if admin is not None and admin not in admin_files:
         raise ValueError(f"No shapefile specified for {admin=}, which is required")
-    return Region(name, admin_files, pk, tz, url, bbox, iso3=iso3)
+    return Region(name, url, bbox, iso3, tz, admin_files, pk)
