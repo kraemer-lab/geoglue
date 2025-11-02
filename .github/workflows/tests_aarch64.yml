@@ -19,10 +19,10 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
     - uses: astral-sh/setup-uv@v5
-    - name: Download cdo package
-      run: wget http://ftp.uk.debian.org/debian/pool/main/c/cdo/cdo_2.5.1-1_arm64.deb
     - name: Install cdo
-      run: sudo apt install ./cdo_2.5.1-1_arm64.deb
+      run: |
+        eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+        brew install cdo
     - name: Install build dependencies
       run: ./scripts/install_exactextract_build_deps.sh
     - name: Lint and test
