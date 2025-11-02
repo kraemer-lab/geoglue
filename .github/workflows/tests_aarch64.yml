@@ -30,4 +30,6 @@ jobs:
     - name: Install build dependencies
       run: ./scripts/install_exactextract_build_deps.sh
     - name: Lint and test
-      run: uvx nox
+      run: |
+        export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+        uvx nox
