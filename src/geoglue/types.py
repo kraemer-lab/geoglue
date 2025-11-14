@@ -123,15 +123,15 @@ coordinates named lat, lon or latitude, longitude""")
         miny = to_num(values.pop())
         minx = to_num(values.pop())
         return Bbox(minx, miny, maxx, maxy)
-    
+
     @property
     def lat_slice(self) -> slice:
         return slice(self.maxy, self.miny)
-    
+
     @property
     def lon_slice(self) -> slice:
         return slice(self.minx, self.maxx)
-    
+
     def to_list(self, spec: str) -> list[int | float]:
         """Returns Bbox converted to list of numbers in different order
 
@@ -230,6 +230,14 @@ class CdoGriddes:
         if kwargs:
             new_out.update(kwargs)
         return CdoGriddes(**out)
+
+    def get_bbox(self) -> Bbox:
+        yfirst, ylast = self.yfirst, self.yfirst + self.yinc * self.ysize
+        if yfirst > ylast:
+            miny, maxy = ylast, yfirst
+        else:
+            miny, maxy = yfirst, ylast
+        return Bbox(self.xfirst, miny, self.xfirst + self.xinc * self.xsize, maxy)
 
     @staticmethod
     def from_dataset(ds: xr.Dataset) -> CdoGriddes:
