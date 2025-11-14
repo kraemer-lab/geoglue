@@ -82,6 +82,7 @@ def sort_lonlat(ds: xr.Dataset) -> xr.Dataset:
         ds.coords["longitude"] = (ds.coords["longitude"] + 180) % 360 - 180
         ds = ds.sortby(ds.longitude)
     ds = ds.sortby(ds.latitude, ascending=False)
+    set_lonlat_attrs(ds)
     return ds
 
 
