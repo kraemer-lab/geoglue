@@ -240,7 +240,7 @@ class CdoGriddes:
         return Bbox(self.xfirst, miny, self.xfirst + self.xinc * self.xsize, maxy)
 
     @staticmethod
-    def from_dataset(ds: xr.Dataset) -> CdoGriddes:
+    def from_dataset(ds: xr.Dataset | xr.DataArray) -> CdoGriddes:
         with tempfile.NamedTemporaryFile(prefix="geoglue-", suffix=".nc") as f:
             ds.to_netcdf(f.name)
             return CdoGriddes.from_file(f.name)
