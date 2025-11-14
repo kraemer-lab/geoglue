@@ -12,7 +12,7 @@ from netCDF4 import Dataset
 
 from .memoryraster import MemoryRaster
 from .util import is_lonlat, sha256
-from .types import Bbox
+from .types import Bbox, CdoGriddes
 
 WARN_BELOW_OVERLAP = 0.8
 
@@ -20,7 +20,7 @@ WARN_BELOW_OVERLAP = 0.8
 def resample(
     resampling: Literal["remapbil", "remapdis"],
     infile: str | Path,
-    target: MemoryRaster,
+    target: MemoryRaster | CdoGriddes,
     outfile: str | Path | None = None,
     skip_exists=True,
 ) -> Path:
@@ -33,7 +33,7 @@ def resample(
     infile
         Input file to read
     target
-        Target MemoryRaster whose grid to resample to
+        Target MemoryRaster whose grid to resample to, or a CdoGriddes
     outfile
         Output resampled file path, if not specified, generated from infile by
         affixing `.resampled` to the path
@@ -51,7 +51,8 @@ def resample(
         infile = Path(infile)
     infile_hash = sha256(infile, prefix=True)
     raster_bbox = Bbox.from_xarray(xr.open_dataset(infile, decode_timedelta=True))
-    if (overlap := raster_bbox.overlap_fraction(target.bbox)) == 0:
+    target_bbox = target.bbox if isinstance(target, MemoryRaster) else target.get_bbox()
+    if (overlap := raster_bbox.overlap_fraction(target_bbox)) == 0:
         raise ValueError("No intersection between input raster and target")
     if overlap < WARN_BELOW_OVERLAP:
         warnings.warn(f"""
@@ -61,23 +62,26 @@ Consider using MemoryRaster.crop() or DataArray.sel() to match extents of input
 raster and target raster; which should ideally only vary in grid cell size.
 
 Raster bounds: {raster_bbox}
-Target bounds: {target.bbox}
+Target bounds: {target_bbox}
 """)
 
     if not is_lonlat(infile):
         raise ValueError(
             "resample only supports lonlat grid, input file does not conform"
         )
-    if not target.is_lonlat:
-        raise ValueError(
-            "resample only supports lonlat grid, target MemoryRaster does not conform"
-        )
+    if (isinstance(target, MemoryRaster) and not target.is_lonlat) or (
+        isinstance(target, CdoGriddes) and target.gridtype != "lonlat"
+    ):
+        raise ValueError("resample only supports lonlat grid, target does not conform")
     if outfile is None:
         outfile = infile.parent / f"{infile.stem}_{resampling}.nc"
     if Path(outfile).exists() and skip_exists:
         return Path(outfile)
     with tempfile.NamedTemporaryFile(suffix=".txt") as griddes:
-        Path(griddes.name).write_text(str(target.griddes))
+        if isinstance(target, MemoryRaster):
+            Path(griddes.name).write_text(str(target.griddes))
+        else:
+            Path(griddes.name).write_text(str(target))
 
         match resampling:
             case "remapbil":
