@@ -67,6 +67,7 @@ class ZonalStatsConfig:
     # top-level
     raster: Path
     shapefile: Path
+    shapefile_id: str
     output: Path
     operation: str
     # weights
@@ -84,8 +85,9 @@ class ZonalStatsTemplate:
     # top-level
     raster: string.Template
     shapefile: string.Template
+    shapefile_id: str
     output: string.Template
-    operation: str
+    operation: str  # TODO: check only a single operation
     # weights
     weights: string.Template | None = None
     resample: ResampleType = "off"
@@ -122,6 +124,7 @@ class ZonalStatsTemplate:
         return ZonalStatsConfig(
             filled["raster"],
             filled["shapefile"],
+            self.shapefile_id,
             filled["output"],
             self.operation,
             filled["weights"],
@@ -140,7 +143,9 @@ class ZonalStatsTemplate:
             raise ValueError(f"Invalid {resample=}, must be one of {ResampleType}")
 
         # required keys
-        _require_keys(data, {"raster", "shapefile", "output", "operation"})
+        _require_keys(
+            data, {"raster", "shapefile", "shapefile_id", "output", "operation"}
+        )
         raster = string.Template(data["raster"])
         shapefile = string.Template(data["shapefile"])
         weights = string.Template(weights) if weights else None
@@ -164,7 +169,13 @@ class ZonalStatsTemplate:
             )
             data["operation"] = "weighted_" + data["operation"]
         return ZonalStatsTemplate(
-            raster, shapefile, output, data["operation"], weights, resample
+            raster,
+            shapefile,
+            data["shapefile_id"],
+            output,
+            data["operation"],
+            weights,
+            resample,
         )
 
     @classmethod
