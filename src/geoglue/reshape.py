@@ -50,6 +50,7 @@ def collapse_step_to_month_dataarray(
             "month": np.arange(1, m + 1),
         },
         name=da.name if da.name else None,
+        attrs=da.attrs,
     )
 
 
