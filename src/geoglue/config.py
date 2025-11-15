@@ -162,7 +162,7 @@ class ZonalStatsTemplate:
             )
         if weights and (
             data["operation"] != "area_weighted_sum"
-            or data["operation"].startswith("weighted_")
+            and not data["operation"].startswith("weighted_")
         ):
             logger.warning(
                 f"{data['operation']=} is not weighted, but weights key present, adding weighted prefix"
