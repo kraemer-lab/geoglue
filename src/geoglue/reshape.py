@@ -49,7 +49,7 @@ def collapse_step_to_month_dataarray(
             "longitude": da["longitude"],
             "month": np.arange(1, m + 1),
         },
-        name=f"{da.name}_dense" if da.name else None,
+        name=da.name if da.name else None,
     )
 
 
