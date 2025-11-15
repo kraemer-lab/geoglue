@@ -10,6 +10,7 @@ def unweighted_config():
         {
             "raster": "data-$year.nc",
             "shapefile": "~/shp/country-$year.shp",
+            "shapefile_id": "id",
             "output": "out-$year.zonal.nc",
             "operation": "mean",
         }
@@ -49,6 +50,7 @@ def test_invalid_resample_raises():
                 "raster": "a.nc",
                 "operation": "mean",
                 "shapefile": "s.shp",
+                "shapefile_id": "id",
                 "output": "a.nc",
                 "resample": "remapnon",
             }
@@ -62,6 +64,7 @@ def test_instantiate_missing_template_key_raises_keyerror():
             "raster": "data-$year-$region.nc",
             "operation": "mean",
             "shapefile": "s.shp",
+            "shapefile_id": "id",
             "output": "o-$year-$region.nc",
         }
     )
@@ -77,6 +80,7 @@ def test_variables_not_in_output_raises_valueerror():
                 "raster": "data-$year-$region.nc",
                 "operation": "mean",
                 "shapefile": "s.shp",
+                "shapefile_id": "id",
                 "output": "o-$year.nc",
             }
         )
@@ -88,6 +92,7 @@ def test_template_vars_read():
             "raster": "data-$year-$region.nc",
             "shapefile": "s.shp",
             "output": "o-$year-$region.nc",
+            "shapefile_id": "id",
             "operation": "mean",
         }
     )
