@@ -4,6 +4,7 @@ import logging
 import hashlib
 import datetime
 from pathlib import Path
+from typing import TypeVar
 import shutil
 
 import xarray as xr
@@ -15,6 +16,22 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
+
+X = TypeVar("X", xr.DataArray, xr.Dataset)
+
+
+def fix_lonlat(ds: xr.DataArray) -> xr.DataArray:
+    if ds.longitude.max() > 180:
+        ds = sort_lonlat(ds)
+    set_lonlat_attrs(ds)
+    return ds
+
+
+def read_geotiff(path: Path) -> xr.DataArray:
+    da = xr.open_dataarray(path).squeeze()
+    if "x" in da.coords and "y" in da.coords:
+        da = da.rename({"x": "longitude", "y": "latitude"})
+    return fix_lonlat(da)
 
 
 def write_variables(ds: xr.Dataset, path: Path) -> list[Path]:
@@ -86,7 +103,7 @@ def crop_dataset_to_geometry(ds: xr.Dataset, geom: gpd.GeoDataFrame) -> xr.Datas
     return ds
 
 
-def sort_lonlat(ds: xr.Dataset) -> xr.Dataset:
+def sort_lonlat(ds: X) -> X:
     "Sorts longitude to -180 - 180 and latitude in descending order"
     if float(ds.coords["longitude"].max()) > 180:
         ds.coords["longitude"] = (ds.coords["longitude"] + 180) % 360 - 180
@@ -96,7 +113,7 @@ def sort_lonlat(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def set_lonlat_attrs(ds: xr.Dataset):
+def set_lonlat_attrs(ds: xr.Dataset | xr.DataArray):
     """Sets CF-compliant grid attributes
 
     Sets grid attributes so that cdo can recognise the grid as `lonlat`
