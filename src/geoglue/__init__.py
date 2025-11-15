@@ -1,4 +1,3 @@
-from .memoryraster import MemoryRaster
 from .region import (
     Region,
     Country,
@@ -10,7 +9,6 @@ from .paths import geoglue_data_path as data_path
 from .paths import geoglue_cache_path as cache_path
 
 __all__ = [
-    "MemoryRaster",
     "Region",
     "Country",
     "AdministrativeLevel",
