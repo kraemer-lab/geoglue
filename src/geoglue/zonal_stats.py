@@ -13,6 +13,12 @@ import geopandas as gpd
 from .util import find_unique_time_coord
 from .memoryraster import MemoryRaster
 
+warnings.warn(
+    "geoglue.zonal_stats is deprecated and will be removed in geoglue in its initial release, use geoglue.zonalstats instead",
+    FutureWarning,
+    stacklevel=2,
+)
+
 
 def zonal_stats(
     da: xr.DataArray,
@@ -66,9 +72,9 @@ def zonal_stats(
         if include_cols is None
         else include_cols
     )
-    assert set(include_cols) < set(geom.columns), (
-        f"{include_cols=} specifies columns not present in the geometry dataframe"
-    )
+    assert set(include_cols) < set(
+        geom.columns
+    ), f"{include_cols=} specifies columns not present in the geometry dataframe"
     time_coord = find_unique_time_coord(da)
     # shape after dropping time axis should be identical
     if operation.startswith("area_weighted_sum") and weights is None:
