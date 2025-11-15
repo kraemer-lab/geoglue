@@ -11,7 +11,6 @@ dependencies = [
     "cdo>=1.6.1",
     "cdsapi>=0.7.5",
     "cfgrib>=0.9.15.0",
-    "distributed>=2025.11.0",
     "exactextract>=0.2.2",
     "fastparquet>=2024.11.0",
     "geopandas>=1.0.1",
