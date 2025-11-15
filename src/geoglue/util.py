@@ -17,6 +17,16 @@ logger = logging.getLogger(__name__)
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
 
 
+def write_variables(ds: xr.Dataset, path: Path) -> list[Path]:
+    folder = path.parent
+    out = []
+    for var in ds.data_vars:
+        var_path = folder / f"{path.stem}.{var}.nc"
+        ds[var].to_netcdf(var_path)
+        out.append(var_path)
+    return out
+
+
 def get_first_monday(year: int) -> datetime.date:
     "Gets first Monday of the year"
     return datetime.datetime.strptime(f"{year}-W01-1", "%Y-W%W-%u").date()
