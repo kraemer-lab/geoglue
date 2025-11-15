@@ -20,7 +20,7 @@ COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
 X = TypeVar("X", xr.DataArray, xr.Dataset)
 
 
-def fix_lonlat(ds: xr.DataArray) -> xr.DataArray:
+def fix_lonlat(ds: X) -> X:
     if ds.longitude.max() > 180:
         ds = sort_lonlat(ds)
     set_lonlat_attrs(ds)
