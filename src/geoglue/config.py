@@ -9,6 +9,8 @@ import tomllib as toml
 from dataclasses import dataclass
 from pathlib import Path
 
+from geoglue.util import logfmt_escape
+
 logger = logging.getLogger(__name__)
 
 # Allowed resample operations (extendable)
@@ -78,6 +80,23 @@ class ZonalStatsConfig:
         for f in ["raster", "shapefile", "weights"]:
             if getattr(self, f) and not getattr(self, f).exists():
                 raise FileNotFoundError(f"{f} = {getattr(self, f)} file not found")
+
+    def __str__(self):
+        _raster = f"raster={logfmt_escape(self.raster)}"
+        _shapefile = f"shapefile={logfmt_escape(self.shapefile)}"
+        _output = f"output={logfmt_escape(self.output)}"
+        _weights = f"weights={logfmt_escape(self.weights)}"
+        return " ".join(
+            [
+                _raster,
+                _shapefile,
+                f"shapefile_id={self.shapefile_id}",
+                _output,
+                f"operation={self.operation}",
+                _weights,
+                f"resample={self.resample}",
+            ]
+        )
 
 
 @dataclass
