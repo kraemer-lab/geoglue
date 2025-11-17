@@ -10,9 +10,12 @@ import cdo
 import xarray as xr
 from netCDF4 import Dataset
 
-from .memoryraster import MemoryRaster
 from .util import is_lonlat, sha256
 from .types import Bbox, CdoGriddes
+
+warnings.filterwarnings("ignore", category=FutureWarning, message=r".*MemoryRaster.*")
+
+from .memoryraster import MemoryRaster  # noqa
 
 WARN_BELOW_OVERLAP = 0.8
 
