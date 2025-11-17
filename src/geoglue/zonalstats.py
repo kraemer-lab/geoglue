@@ -118,4 +118,6 @@ def compute_config(cfg: ZonalStatsConfig) -> xr.DataArray:
     # Run exactextract in parallel using dask across non-spatial dimensions
     # Currently only dataarrays are supported
     rast = xr.open_dataarray(raster_path)
-    return zonalstats(rast, vec, cfg.operation, weights=weights)
+    da = zonalstats(rast, vec, cfg.operation, weights=weights)
+    da.attrs["geoglue_config"] = str(cfg)
+    return da
