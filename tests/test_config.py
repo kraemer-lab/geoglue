@@ -17,6 +17,31 @@ def unweighted_config():
     )
 
 
+@pytest.fixture(scope="session")
+def weighted_config():
+    return ZonalStatsTemplate.from_dict(
+        {
+            "raster": "data $year.nc",
+            "shapefile": "shp/country-$year.shp",
+            "shapefile_id": "id",
+            "output": "output $year.zonal.nc",
+            "operation": "mean",
+            "weights": "weights $year.tif",
+            "resample": "remapbil",
+        }
+    )
+
+
+def test_strconfig(weighted_config):
+    cfg = weighted_config.fill(year=2015)
+    assert str(cfg) == (
+        """raster="data 2015.nc" """
+        """shapefile=shp/country-2015.shp """
+        """shapefile_id=id output="output 2015.zonal.nc" """
+        """operation=weighted_mean weights="weights 2015.tif" resample=remapbil"""
+    )
+
+
 def test_read_basic_config_and_instantiate(unweighted_config):
     """Simple config with templates and ~ expansion via instantiate."""
 
