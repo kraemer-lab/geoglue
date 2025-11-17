@@ -1,5 +1,6 @@
 "Utility functions for geoglue"
 
+import re
 import logging
 import hashlib
 import datetime
@@ -27,11 +28,31 @@ def fix_lonlat(ds: X) -> X:
     return ds
 
 
-def read_geotiff(path: Path) -> xr.DataArray:
+def read_geotiff(path: str | Path) -> xr.DataArray:
     da = xr.open_dataarray(path).squeeze()
     if "x" in da.coords and "y" in da.coords:
         da = da.rename({"x": "longitude", "y": "latitude"})
     return fix_lonlat(da)
+
+
+def logfmt_escape(value: str | Path | None) -> str:
+    """
+    Escape a string for logfmt-safe output
+
+    Examples:
+        logfmt_escape("ok") -> "ok"
+        logfmt_escape("has space") -> "\"has space\""
+        logfmt_escape("weird=\"val\"") -> "\"weird=\\\"val\\\"\""
+    """
+    if value is None:
+        return '""'
+
+    s = str(value)
+    # check if quoting is needed
+    if re.search(r'[\s="\\]', s):
+        s = s.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{s}"'
+    return s
 
 
 def write_variables(ds: xr.Dataset, path: Path) -> list[Path]:
