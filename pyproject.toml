@@ -11,6 +11,7 @@ dependencies = [
     "cdo>=1.6.1",
     "cdsapi>=0.7.5",
     "cfgrib>=0.9.15.0",
+    "click>=8.1.8",
     "exactextract>=0.2.2",
     "fastparquet>=2024.11.0",
     "geopandas>=1.0.1",
@@ -33,6 +34,9 @@ docs = [
     "jupyter-book==1.*",
     "sphinx-markdown-builder==0.6.*",
 ]
+
+[project.scripts]
+geoglue = "geoglue.cli:main"
 
 [build-system]
 requires = ["hatchling"]
