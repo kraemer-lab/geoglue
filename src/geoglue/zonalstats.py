@@ -93,6 +93,7 @@ def zonalstats(
 
 def compute_config(cfg: ZonalStatsConfig) -> xr.DataArray:
     # try reading files
+    cfg.check_exists()
     if cfg.raster.suffix != ".nc":
         raise ValueError("Unsupported file format %r", cfg.raster)
     raster_path = cfg.raster

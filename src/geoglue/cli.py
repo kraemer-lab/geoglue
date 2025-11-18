@@ -107,6 +107,11 @@ def zonalstats(config: str, params: tuple[str]) -> None:
         kwargs[key] = value
     tmpl = ZonalStatsTemplate.read_file(config)
     cfg = tmpl.fill(**kwargs)
+    try:
+        cfg.check_exists()
+    except FileNotFoundError as e:
+        print(e)
+        raise SystemExit(1)
     print(
         f"conf={config} begin={datetime.datetime.now(datetime.timezone.utc).isoformat()}"
     )
