@@ -112,15 +112,15 @@ def zonalstats(config: str, params: tuple[str]) -> None:
     except FileNotFoundError as e:
         print(e)
         raise SystemExit(1)
-    print(
-        f"conf={config} begin={datetime.datetime.now(datetime.timezone.utc).isoformat()}"
-    )
+    start_time = datetime.datetime.now(datetime.timezone.utc)
+    print(f"conf={config} begin={start_time.isoformat()}")
     da = compute_config(cfg)
     nna = da.isnull().sum().item()
     da.to_netcdf(cfg.output)
     print(f"NA={nna}", cfg)
+    end_time = datetime.datetime.now(datetime.timezone.utc)
     print(
-        f"conf={config} end={datetime.datetime.now(datetime.timezone.utc).isoformat()}"
+        f"conf={config} end={end_time.isoformat()} elapsed={(end_time - start_time).seconds}s"
     )
 
 
