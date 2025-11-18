@@ -4,6 +4,7 @@ This is going to replace geoglue.zonal_stats
 """
 
 import logging
+from pathlib import Path
 
 import exactextract
 import numpy as np
@@ -104,17 +105,14 @@ def compute_config(cfg: ZonalStatsConfig) -> xr.DataArray:
         weights = read_geotiff(cfg.weights)
     else:
         weights = xr.open_dataarray(cfg.weights)
+    resampled_path: Path = raster_path.parent / f"{cfg.raster.stem}.{cfg.resample}.nc"
 
     # Resample raster to weights unless resampling = 'off'
     if weights is not None and cfg.resample != "off":
         griddes = CdoGriddes.from_dataset(weights)
         assert griddes.gridtype == "lonlat"
-        raster_path = resample(
-            cfg.resample,
-            raster_path,
-            griddes,
-            cfg.raster.parent / f"{cfg.raster.stem}.{cfg.resample}.nc",
-        )
+        print("resample", cfg.raster, "->", resampled_path)
+        raster_path = resample(cfg.resample, raster_path, griddes, resampled_path)
 
     # At this point, raster and weights grid should be aligned (if using weights)
     # Run exactextract in parallel using dask across non-spatial dimensions

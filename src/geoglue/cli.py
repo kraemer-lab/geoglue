@@ -1,5 +1,6 @@
 """geoglue command-line interface"""
 
+import datetime
 from pathlib import Path
 
 import click
@@ -106,10 +107,16 @@ def zonalstats(config: str, params: tuple[str]) -> None:
         kwargs[key] = value
     tmpl = ZonalStatsTemplate.read_file(config)
     cfg = tmpl.fill(**kwargs)
+    print(
+        f"conf={config} begin={datetime.datetime.now(datetime.timezone.utc).isoformat()}"
+    )
     da = compute_config(cfg)
     nna = da.isnull().sum().item()
     da.to_netcdf(cfg.output)
     print(f"NA={nna}", cfg)
+    print(
+        f"conf={config} end={datetime.datetime.now(datetime.timezone.utc).isoformat()}"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
