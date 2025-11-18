@@ -96,6 +96,8 @@ def compute_config(cfg: ZonalStatsConfig) -> xr.DataArray:
         raise ValueError("Unsupported file format %r", cfg.raster)
     raster_path = cfg.raster
     vec: gpd.GeoDataFrame = gpd.read_file(cfg.shapefile).set_index(cfg.shapefile_id)  # type: ignore
+    if not cfg.output.parent.exists():
+        cfg.output.parent.mkdir(parents=True, exist_ok=True)
     if cfg.weights is None:
         weights = None
     elif cfg.weights.suffix in [".tif", ".tiff"]:
