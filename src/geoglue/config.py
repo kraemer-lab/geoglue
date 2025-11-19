@@ -59,8 +59,20 @@ def _apply_template(s: string.Template, mapping: dict) -> str:
     """
     Expand $var like templates from string `s` using mapping
     """
+    if "iso3" in mapping:
+        mapping["iso3"] = mapping["iso3"].upper()
+        mapping["iso3_lower"] = mapping["iso3"].lower()
     s = string.Template(os.path.expanduser(s.template))
     return s.substitute(mapping)
+
+
+def _check_vars_match(input_vars: set[str], output_vars: set[str]):
+    if "iso3_lower" in input_vars:
+        input_vars = (input_vars - {"iso3_lower"}) | {"iso3"}
+    if "iso3_lower" in output_vars:
+        output_vars = (output_vars - {"iso3_lower"}) | {"iso3"}
+    if input_vars != output_vars:
+        raise ValueError(f"All variables in input {input_vars} must be in output")
 
 
 @dataclass(frozen=True)
@@ -130,6 +142,9 @@ class CropConfigTemplate:
         region = string.Template(data["region"])
         output = string.Template(data["output"])
         integer_bounds = bool(data["integer_bounds"])
+        input_vars = _get_template_vars(raster) | _get_template_vars(region)
+        output_vars = _get_template_vars(output)
+        _check_vars_match(input_vars, output_vars)
         return CropConfigTemplate(raster, region, output, integer_bounds, split)
 
     @classmethod
@@ -258,10 +273,7 @@ class ZonalStatsTemplate:
             | _get_template_vars(weights)
         )
         output_vars = _get_template_vars(output)
-        if input_vars != output_vars:
-            raise ValueError(
-                "All variables in input {input_vars} must be in output={output.template!r}"
-            )
+        _check_vars_match(input_vars, output_vars)
         if weights and (
             not data["operation"].startswith("area_weighted_sum")
             and not data["operation"].startswith("weighted_")

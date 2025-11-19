@@ -1,7 +1,12 @@
 import os
 import pytest
 from pathlib import Path
-from geoglue.config import CropConfig, CropConfigTemplate, ZonalStatsTemplate
+from geoglue.config import (
+    CropConfig,
+    CropConfigTemplate,
+    ZonalStatsTemplate,
+    ZonalStatsConfig,
+)
 from geoglue.types import Bbox
 
 
@@ -53,6 +58,33 @@ def weighted_config():
             "weights": "weights $year.tif",
             "resample": "remapbil",
         }
+    )
+
+
+@pytest.fixture(scope="session")
+def iso3_config():
+    return ZonalStatsTemplate.from_dict(
+        {
+            "raster": "data $iso3 $year.nc",
+            "shapefile": "shp/gadm41_${iso3}_1.shp",
+            "shapefile_id": "id",
+            "output": "output $iso3 $year.zonal.nc",
+            "operation": "mean",
+            "weights": "weights $iso3_lower $year.tif",
+            "resample": "remapbil",
+        }
+    )
+
+
+def test_iso3_config(iso3_config):
+    assert iso3_config.fill(year=2015, iso3="sgp") == ZonalStatsConfig(
+        raster=Path("data SGP 2015.nc"),
+        shapefile=Path("shp/gadm41_SGP_1.shp"),
+        shapefile_id="id",
+        output=Path("output SGP 2015.zonal.nc"),
+        operation="weighted_mean",
+        weights=Path("weights sgp 2015.tif"),
+        resample="remapbil",
     )
 
 
