@@ -50,14 +50,14 @@ def _slice_extract_core(
         if "(" in ops and ")" in ops:
             # extract the bit between brackets
             if op_match := re.search(r"\((.*)\)", ops):
-                op_params = op_match.group(1)
+                op_params = "(" + op_match.group(1) + ")"
             else:
                 raise ValueError(f"Invalid operation supplied: {ops}")
             logger.info(f"zonalstats using {op_params=}")
         res: pd.DataFrame = exactextract.exact_extract(
             da,
             vec,
-            [f"weighted_sum({op_params})", f"count({op_params})"],
+            [f"weighted_sum{op_params}", f"count{op_params}"],
             weights=weights,
             output="pandas",
         )  # type: ignore
@@ -83,7 +83,7 @@ def zonalstats(
         "lat": rast["latitude"].values,
         "lon": rast["longitude"].values,
     }
-    if ops == "area_weighted_sum" and weights is None:
+    if ops.startswith("area_weighted_sum") and weights is None:
         raise ValueError("area_weighted_sum requires weights to be set")
 
     result = xr.apply_ufunc(
