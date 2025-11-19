@@ -10,10 +10,10 @@ def crop_config():
     return CropConfigTemplate.from_dict(
         {
             "raster": "WLD-$year-dataset.nc",
-            "region": "data/SGP/geoboundaries/gadm41_SGP_1.shp",
+            "region": "data/VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp",
             "integer_bounds": True,
             "split": False,
-            "output": "output/SGP-1-$year-dataset.nc",
+            "output": "output/VNM-1-$year-dataset.nc",
         }
     )
 
@@ -22,8 +22,8 @@ def test_fill_crop_config(crop_config):
     cfg = crop_config.fill(year=2015)
     assert cfg == CropConfig(
         Path("WLD-2015-dataset.nc"),
-        Bbox(minx=103, miny=1, maxx=105, maxy=2),
-        Path("output/SGP-1-2015-dataset.nc"),
+        Bbox(minx=102, miny=8, maxx=115, maxy=24),
+        Path("output/VNM-1-2015-dataset.nc"),
         split=False,
     )
 
