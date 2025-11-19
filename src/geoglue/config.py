@@ -263,7 +263,7 @@ class ZonalStatsTemplate:
                 "All variables in input {input_vars} must be in output={output.template!r}"
             )
         if weights and (
-            data["operation"] != "area_weighted_sum"
+            not data["operation"].startswith("area_weighted_sum")
             and not data["operation"].startswith("weighted_")
         ):
             logger.warning(

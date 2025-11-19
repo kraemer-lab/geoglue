@@ -3,6 +3,7 @@
 This is going to replace geoglue.zonal_stats
 """
 
+import re
 import logging
 from pathlib import Path
 
@@ -40,18 +41,23 @@ def _slice_extract_core(
         dims=("latitude", "longitude"),
         coords={"latitude": lat, "longitude": lon},
     )
-    if ops != "area_weighted_sum":
+    if not ops.startswith("area_weighted_sum"):
         val: pd.DataFrame = exactextract.exact_extract(
             da, vec, ops, weights=weights, output="pandas"
         )  # type: ignore
     else:
+        op_params = ""
+        if "(" in ops and ")" in ops:
+            # extract the bit between brackets
+            if op_match := re.search(r"\((.*)\)", ops):
+                op_params = "(" + op_match.group(1) + ")"
+            else:
+                raise ValueError(f"Invalid operation supplied: {ops}")
+            logger.info(f"zonalstats using {op_params=}")
         res: pd.DataFrame = exactextract.exact_extract(
             da,
             vec,
-            [
-                "weighted_sum(coverage_weight=area_spherical_km2,default_value=0,default_weight=0)",
-                "count(coverage_weight=area_spherical_km2,default_value=0,default_weight=0)",
-            ],
+            [f"weighted_sum{op_params}", f"count{op_params}"],
             weights=weights,
             output="pandas",
         )  # type: ignore
@@ -77,7 +83,7 @@ def zonalstats(
         "lat": rast["latitude"].values,
         "lon": rast["longitude"].values,
     }
-    if ops == "area_weighted_sum" and weights is None:
+    if ops.startswith("area_weighted_sum") and weights is None:
         raise ValueError("area_weighted_sum requires weights to be set")
 
     result = xr.apply_ufunc(

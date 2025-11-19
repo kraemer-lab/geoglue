@@ -57,7 +57,8 @@ def test_zonal_stats_raises_error(dataset, vnm_geoboundaries_admin2, vnm_pop):
     "op,int_value_max",
     [
         ("weighted_sum(default_value=0,default_weight=0)", 2269),
-        ("area_weighted_sum", 45),
+        ("area_weighted_sum(default_value=0,default_weight=0)", 45),
+        ("area_weighted_sum(default_weight=0)", 45),
     ],
 )
 def test_zonalstats(
