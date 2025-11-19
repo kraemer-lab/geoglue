@@ -2,15 +2,27 @@
 
 import datetime
 from pathlib import Path
+from typing import Sequence
 
 import click
 import xarray as xr
-import geopandas as gpd
 
 from .types import Bbox
-from .util import read_geotiff, write_variables
+from .util import write_variables
 from .zonalstats import compute_config
-from .config import ZonalStatsTemplate
+from .config import CropConfigTemplate, ZonalStatsTemplate
+
+
+def parse_params(params: Sequence[str]) -> dict[str, str]:
+    kwargs = {}
+    for p in params:
+        if "=" not in p:
+            raise click.ClickException(
+                f"Invalid argument '{p}', expected key=value format."
+            )
+        key, value = p.split("=", 1)
+        kwargs[key] = value
+    return kwargs
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -35,51 +47,27 @@ def cli(ctx: click.Context, verbose: int) -> None:
     a shapefile (.shp) or a raster (.tif)
 """,
 )
-@click.argument("input", type=click.Path(exists=True, dir_okay=False, readable=True))
-@click.argument(
-    "region",
-    type=str,
-)
-@click.argument("output", type=click.Path(dir_okay=False, writable=True))
-@click.option("--int", "integer_bounds", is_flag=True, help="Crop to integer bounds")
-@click.option("--split", is_flag=True, help="Split cropped file by variable")
-def crop(
-    input: str, region: str, output: str, integer_bounds: bool, split: bool
-) -> None:
+@click.argument("config", type=click.Path(exists=True, dir_okay=False, readable=True))
+@click.argument("params", nargs=-1)
+def crop(config: str, params: tuple[str]) -> None:
     """
-    geoglue crop <netcdf-file> <bbox-or-shapefile> <output> [--int]
+    geoglue crop <config>
     """
-    if "," in region:
-        # try processing as a bbox
-        bbox = Bbox.from_string(region)
-    elif region.endswith(".shp"):  # crop to shapefile
-        vec = gpd.read_file(region)
-        bbox = Bbox(*vec.total_bounds)
-    elif region.endswith(".nc"):
-        rast = xr.open_dataset(region)
-        bbox = Bbox.from_xarray(rast)
-    elif region.endswith(".tif"):
-        rast = read_geotiff(region)
-        bbox = Bbox.from_xarray(rast)
-    else:
-        print(
-            "ERROR: Unrecognised file type, you can specify bbox directly as minx,miny,maxx,maxy"
-        )
-        raise SystemExit(1)
-    src_rast = xr.open_dataset(input)
+    kwargs = parse_params(params)
+    tmpl = CropConfigTemplate.read_file(config)
+    cfg = tmpl.fill(**kwargs)
+    print("crop", cfg)
+    src_rast = xr.open_dataset(cfg.raster)
     src_bbox = Bbox.from_xarray(src_rast)
-    if integer_bounds:
-        bbox = bbox.int()
-    if not (src_bbox > bbox):
-        print(f"ERROR: Source bbox {src_bbox} not larger than target bbox {bbox}")
+    if not (src_bbox > cfg.bbox):
+        print(f"ERROR: Source bbox {src_bbox} not larger than target bbox {cfg.bbox}")
         raise SystemExit(1)
-    src_rast = src_rast.sel(latitude=bbox.lat_slice, longitude=bbox.lon_slice)
-    if not split:
-        src_rast.to_netcdf(output)
-        print(output)
+    src_rast = src_rast.sel(latitude=cfg.bbox.lat_slice, longitude=cfg.bbox.lon_slice)
+    if not cfg.split:
+        src_rast.to_netcdf(cfg.output)
     else:
-        outputs = write_variables(src_rast, Path(output))
-        print("\n".join(map(str, outputs)))
+        outputs = write_variables(src_rast, Path(cfg.output))
+        print("\n".join("crop " + str(o) for o in outputs))
 
 
 @cli.command(
@@ -97,14 +85,7 @@ def zonalstats(config: str, params: tuple[str]) -> None:
     """
     geoglue zonalstats <toml-file> [<p1=v1> <p2=v2> ...]
     """
-    kwargs = {}
-    for p in params:
-        if "=" not in p:
-            raise click.ClickException(
-                f"Invalid argument '{p}', expected key=value format."
-            )
-        key, value = p.split("=", 1)
-        kwargs[key] = value
+    kwargs = parse_params(params)
     tmpl = ZonalStatsTemplate.read_file(config)
     cfg = tmpl.fill(**kwargs)
     try:
@@ -113,14 +94,14 @@ def zonalstats(config: str, params: tuple[str]) -> None:
         print(e)
         raise SystemExit(1)
     start_time = datetime.datetime.now(datetime.timezone.utc)
-    print(f"conf={config} begin={start_time.isoformat()}")
+    print(f"zonalstats conf={config} begin={start_time.isoformat()}")
     da = compute_config(cfg)
     nna = da.isnull().sum().item()
     da.to_netcdf(cfg.output)
-    print(f"NA={nna}", cfg)
+    print(f"zonalstats NA={nna}", cfg)
     end_time = datetime.datetime.now(datetime.timezone.utc)
     print(
-        f"conf={config} end={end_time.isoformat()} elapsed={(end_time - start_time).seconds}s"
+        f"zonalstats conf={config} end={end_time.isoformat()} elapsed={(end_time - start_time).seconds}s"
     )
 
 

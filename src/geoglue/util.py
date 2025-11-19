@@ -14,11 +14,31 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
+from geoglue.types import Bbox
+
 logger = logging.getLogger(__name__)
 
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
 
 X = TypeVar("X", xr.DataArray, xr.Dataset)
+
+
+def bbox_from_region(region: str, integer_bounds: bool = False) -> Bbox:
+    if "," in region:
+        # try processing as a bbox
+        bbox = Bbox.from_string(region)
+    elif region.endswith(".shp"):  # crop to shapefile
+        vec = gpd.read_file(region)
+        bbox = Bbox(*vec.total_bounds)
+    elif region.endswith(".nc"):
+        rast = xr.open_dataset(region)
+        bbox = Bbox.from_xarray(rast)
+    elif region.endswith(".tif"):
+        rast = read_geotiff(region)
+        bbox = Bbox.from_xarray(rast)
+    else:
+        raise ValueError("Unsupported region, must be one of .shp, .tif, .nc or a bbox")
+    return bbox if not integer_bounds else bbox.int()
 
 
 def fix_lonlat(ds: X) -> X:

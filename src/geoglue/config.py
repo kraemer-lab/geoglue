@@ -9,7 +9,8 @@ import tomllib as toml
 from dataclasses import dataclass
 from pathlib import Path
 
-from geoglue.util import logfmt_escape
+from geoglue.types import Bbox
+from geoglue.util import bbox_from_region, logfmt_escape
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,88 @@ def _apply_template(s: string.Template, mapping: dict) -> str:
     """
     s = string.Template(os.path.expanduser(s.template))
     return s.substitute(mapping)
+
+
+@dataclass(frozen=True)
+class CropConfig:
+    "Instantiated version of CropConfigTemplate"
+
+    raster: Path
+    bbox: Bbox
+    output: Path
+    split: bool = False
+
+    def check_exists(self):
+        if not self.raster.exists():
+            raise FileNotFoundError("Raster file {self.raster} not found")
+
+    def __str__(self):
+        _raster = logfmt_escape(self.raster)
+        _output = logfmt_escape(self.output)
+        return f"raster={_raster} bbox={self.bbox} output={_output} split={self.split}"
+
+
+@dataclass
+class CropConfigTemplate:
+    """Configuration that can be passed to `geoglue crop`"""
+
+    raster: string.Template
+    region: string.Template
+    output: string.Template
+    integer_bounds: bool
+    split: bool = True
+
+    @property
+    def template_vars(self) -> set[str]:
+        return (
+            _get_template_vars(self.raster)
+            | _get_template_vars(self.region)
+            | _get_template_vars(self.output)
+        )
+
+    def fill(self, **kwargs) -> CropConfig:
+        """
+        Fill in a CropConfigTemplate and return a CropConfig
+        Also checks that files exist
+        """
+        mapping = dict(kwargs)
+
+        filled = {
+            "raster": Path(_apply_template(self.raster, mapping)),
+            "region": _apply_template(self.region, mapping),
+            "output": Path(_apply_template(self.output, mapping)),
+        }
+        bbox = bbox_from_region(filled["region"], self.integer_bounds)
+
+        return CropConfig(filled["raster"], bbox, filled["output"], self.split)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CropConfigTemplate:
+        """
+        Reads a dictionary into a ZonalStatsTemplate instance
+        """
+        # optional keys
+        split = bool(data.get("split", True))
+
+        # required keys
+        _require_keys(data, {"raster", "region", "output", "integer_bounds"})
+        raster = string.Template(data["raster"])
+        region = string.Template(data["region"])
+        output = string.Template(data["output"])
+        integer_bounds = bool(data["integer_bounds"])
+        return CropConfigTemplate(raster, region, output, integer_bounds, split)
+
+    @classmethod
+    def read_file(cls, path: str | Path) -> CropConfigTemplate:
+        """
+        Reads a TOML config file into a CropConfigTemplate instance
+        """
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Config file not found: {path}")
+
+        with open(path, "rb") as fp:
+            return cls.from_dict(toml.load(fp))
 
 
 @dataclass(frozen=True)
