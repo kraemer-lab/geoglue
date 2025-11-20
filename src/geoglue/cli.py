@@ -1,14 +1,16 @@
 """geoglue command-line interface"""
 
 import datetime
+import tempfile
 from pathlib import Path
 from typing import Sequence
 
+from cdo import Cdo
 import click
 import xarray as xr
 
 from .types import Bbox
-from .util import write_variables
+from .util import read_geotiff, write_variables
 from .zonalstats import compute_config
 from .config import CropConfigTemplate, ZonalStatsTemplate
 
@@ -103,6 +105,21 @@ def zonalstats(config: str, params: tuple[str]) -> None:
     print(
         f"zonalstats conf={config} end={end_time.isoformat()} elapsed={(end_time - start_time).seconds}s"
     )
+
+
+@cli.command("griddes", help="Show CDO grid description (griddes) for a file")
+@click.argument("file", type=click.Path(exists=True, dir_okay=False, readable=True))
+def griddes(file: Path):
+    _cdo = Cdo()
+
+    match Path(file).suffix:
+        case ".nc":
+            print("\n".join(_cdo.griddes(input=str(file))))
+        case ".tif":
+            da = read_geotiff(file)
+            with tempfile.NamedTemporaryFile(prefix="geoglue-", suffix=".nc") as f:
+                da.to_netcdf(f.name)
+                print("\n".join(_cdo.griddes(input=str(f.name))))
 
 
 def main(argv: list[str] | None = None) -> int:
