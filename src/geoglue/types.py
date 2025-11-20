@@ -95,9 +95,9 @@ class Bbox(NamedTuple):
     def from_xarray(da: xr.DataArray | xr.Dataset) -> Bbox:
         coords = set(da.coords)
         c_lon, c_lat = None, None
-        if {"lon", "lat"} < coords:
+        if {"lon", "lat"} <= coords:
             c_lon, c_lat = "lon", "lat"
-        if {"longitude", "latitude"} < coords:
+        if {"longitude", "latitude"} <= coords:
             c_lon, c_lat = "longitude", "latitude"
         if c_lon is None and c_lat is None:
             raise ValueError("""Can only convert from DataArray or Dataset that has
