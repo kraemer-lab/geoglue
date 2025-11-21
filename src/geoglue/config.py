@@ -74,6 +74,10 @@ class GeoglueConfig:
                 raise ValueError(
                     f"Shapefile {region_path} for region={r!r} does not have ID column {region_id!r}"
                 )
+            if len(df) != len(df[region_id].unique()):
+                raise ValueError(
+                    f"Column {region_id!r} is not unique for shapefile {region_path}"
+                )
             out_region[r] = ShapefileConfig(Path(region_path), region_id)
         return GeoglueConfig(operation, out_region)
 
