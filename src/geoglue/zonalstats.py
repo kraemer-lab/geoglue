@@ -118,7 +118,7 @@ def compute_config(cfg: ZonalStatsConfig) -> xr.DataArray:
     if weights is not None and cfg.resample != "off":
         griddes = CdoGriddes.from_dataset(weights)
         assert griddes.gridtype == "lonlat"
-        print("resample", cfg.raster, "->", resampled_path)
+        print(f"resample\t{cfg.raster} -> {resampled_path}")
         raster_path = resample(cfg.resample, raster_path, griddes, resampled_path)
 
     # At this point, raster and weights grid should be aligned (if using weights)
