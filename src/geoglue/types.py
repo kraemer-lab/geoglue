@@ -64,6 +64,12 @@ class Bbox(NamedTuple):
         return shapely.geometry.box(self.minx, self.miny, self.maxx, self.maxy)
 
     @property
+    def safe_name(self) -> str:
+        return f"{self.minx}_{self.miny}_{self.maxx}_{self.maxy}".replace(
+            ".", "p"
+        ).replace("-", "m")
+
+    @property
     def geodetic_area_km2(self) -> float:
         lons = [self.minx, self.maxx, self.maxx, self.minx, self.minx]
         lats = [self.miny, self.miny, self.maxy, self.maxy, self.miny]
