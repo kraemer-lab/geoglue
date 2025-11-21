@@ -10,7 +10,7 @@ import xarray as xr
 import warnings
 
 from .types import Bbox
-from .util import bbox_from_region, write_variables
+from .util import bbox_from_region, write_variables, read_geotiff
 from .zonalstats import compute_config
 from .config import (
     ResampleType,
