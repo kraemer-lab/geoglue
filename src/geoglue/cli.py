@@ -9,6 +9,8 @@ import click
 import xarray as xr
 import warnings
 
+from geoglue.validate import stats_nonregion
+
 from .types import Bbox
 from .util import bbox_from_region, write_variables, read_geotiff
 from .zonalstats import compute_config
@@ -38,6 +40,13 @@ def cli(ctx: click.Context, verbose: int) -> None:
     """
     # store verbosity in context for downstream commands (if needed)
     ctx.obj = {"verbose": verbose}
+
+
+@cli.command("validate", help="Shows validation info for a zonalstats processed file")
+@click.argument("file", type=click.Path(exists=True, dir_okay=False, readable=True))
+def validate(file: str):
+    da = xr.open_dataarray(file)
+    stats_nonregion(da)
 
 
 @cli.command(
