@@ -160,6 +160,11 @@ def crop(
     type=click.Path(exists=True, dir_okay=False, readable=True),
     help="geoglue configuration",
 )
+@click.option(
+    "--tmp",
+    type=click.Path(exists=True, dir_okay=True, file_okay=False, readable=True),
+    help="Temporary directory for intermediate files",
+)
 def zonalstats(
     raster: str,
     region: str,
@@ -168,8 +173,12 @@ def zonalstats(
     resample: ResampleType = "off",
     output: str | None = None,
     config: str | None = None,
+    tmp: str | None = None,
 ) -> None:
     gcfg = read_config(config)
+    tmp_path = tmp or gcfg.tmp_path
+    if isinstance(tmp_path, str):
+        tmp_path = Path(tmp_path)
     if resample not in ["remapbil", "remapdis", "off"]:
         raise ValueError("Unsupported method {resample=}")
     if "::" in region:
@@ -206,6 +215,7 @@ def zonalstats(
         operation=op,
         weights=weights_p,
         resample=resample,
+        tmp_path=tmp_path,
     )
     try:
         cfg.check_exists()
