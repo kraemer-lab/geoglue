@@ -112,7 +112,12 @@ def compute_config(cfg: ZonalStatsConfig) -> xr.DataArray:
         weights = read_geotiff(cfg.weights)
     else:
         weights = xr.open_dataarray(cfg.weights)
-    resampled_path: Path = raster_path.parent / f"{cfg.raster.stem}.{cfg.resample}.nc"
+    if cfg.tmp_path:
+        resampled_path: Path = cfg.tmp_path / f"{cfg.raster.stem}.{cfg.resample}.nc"
+    else:
+        resampled_path: Path = (
+            raster_path.parent / f"{cfg.raster.stem}.{cfg.resample}.nc"
+        )
 
     # Resample raster to weights unless resampling = 'off'
     if weights is not None and cfg.resample != "off":

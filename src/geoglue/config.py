@@ -1,6 +1,7 @@
 """Zonal stats task configuration"""
 
 from __future__ import annotations
+import os
 import typing
 import logging
 import tomllib as toml
@@ -54,10 +55,18 @@ class ShapefileConfig:
 class GeoglueConfig:
     operation: dict[str, str]
     region: dict[str, ShapefileConfig]
+    paths: dict[str, Path]
     source: Path | None = None
+
+    @property
+    def tmp_path(self) -> Path | None:
+        return self.paths.get("tmp", None)
 
     @staticmethod
     def from_dict(data: dict) -> GeoglueConfig:
+        paths = data.get("paths", {})
+        for p in paths:
+            paths[p] = Path(os.path.expandvars(Path(paths[p]).expanduser()))
         operation = data.get("operation", {})
         region = data.get("region", {})
         out_region = {}
@@ -79,18 +88,18 @@ class GeoglueConfig:
                     f"Column {region_id!r} is not unique for shapefile {region_path}"
                 )
             out_region[r] = ShapefileConfig(Path(region_path), region_id)
-        return GeoglueConfig(operation, out_region)
+        return GeoglueConfig(operation, out_region, paths)
 
     @staticmethod
     def nil() -> GeoglueConfig:
-        return GeoglueConfig({}, {}, None)
+        return GeoglueConfig({}, {}, {}, None)
 
     @staticmethod
     def read_file(file: str | Path) -> GeoglueConfig:
         with open(file, "rb") as fp:
             data = toml.load(fp)
             cfg = GeoglueConfig.from_dict(data)
-            return GeoglueConfig(cfg.operation, cfg.region, Path(file))
+            return GeoglueConfig(cfg.operation, cfg.region, cfg.paths, Path(file))
 
 
 @dataclass(frozen=True)
@@ -125,6 +134,7 @@ class ZonalStatsConfig:
     # weights
     weights: Path | None = None
     resample: ResampleType = "off"
+    tmp_path: Path | None = None
 
     def check_exists(self):
         for f in ["raster", "shapefile", "weights"]:
