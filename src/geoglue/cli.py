@@ -12,7 +12,7 @@ import warnings
 from geoglue.validate import stats_nonregion
 
 from .types import Bbox
-from .util import bbox_from_region, write_variables, read_geotiff
+from .util import bbox_from_region, read_raster, write_variables, read_geotiff
 from .zonalstats import compute_config
 from .config import (
     ResampleType,
@@ -59,11 +59,15 @@ def validate(file: str):
 )
 @click.argument("raster", type=click.Path(exists=True, dir_okay=False, readable=True))
 @click.argument("bounds")
-@click.option("--exact-bounds", is_flag=True, help="Do not crop to integer bounds")
 @click.option(
     "--split/--no-split",
     default=True,
     help="Whether to split by variable (default=True)",
+)
+@click.option(
+    "--cover",
+    help="Additional raster that the cropped raster should cover",
+    type=click.Path(exists=True, dir_okay=False, readable=True),
 )
 @click.option(
     "-o",
@@ -77,8 +81,8 @@ def validate(file: str):
 def crop(
     raster: str,
     bounds: str,
-    exact_bounds: bool = False,
     split: bool = True,
+    cover: str | None = None,
     output: str | None = None,
     config: str | None = None,
 ) -> None:
@@ -93,9 +97,19 @@ def crop(
     if bounds in cfg.region:
         # bounds is actually a region name, read that instead
         region = cfg.region[bounds]
-        bbox = bbox_from_region(str(region.file), integer_bounds=not exact_bounds)
+        bbox = bbox_from_region(str(region.file), integer_bounds=True)
     else:
-        bbox = bbox_from_region(bounds, integer_bounds=not exact_bounds)
+        bbox = bbox_from_region(bounds, integer_bounds=True)
+
+    if cover:
+        cover_rast = read_raster(cover)
+        cover_bbox = Bbox.from_xarray(cover_rast)
+        while not bbox > cover_bbox:
+            bbox = bbox.enlarge(by=1)
+        # Enlarge one more time to ensure grid cells are present
+        # on all the edges. This is important for grids that are 1 degree spaced
+        # TODO: enlarge by specific number of grid cells depending on source resalution
+        bbox = bbox.enlarge(by=1)
     if not (src_bbox > bbox):
         print(f"ERROR: Source bbox {src_bbox} not larger than target bbox {bbox}")
         raise SystemExit(1)
