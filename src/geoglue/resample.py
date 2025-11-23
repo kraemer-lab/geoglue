@@ -55,14 +55,11 @@ def resample(
     infile_hash = sha256(infile, prefix=True)
     raster_bbox = Bbox.from_xarray(xr.open_dataset(infile, decode_timedelta=True))
     target_bbox = target.bbox if isinstance(target, MemoryRaster) else target.get_bbox()
-    if (coverage := raster_bbox.coverage_fraction(target_bbox)) == 0:
-        raise ValueError("No intersection between input raster and target")
-    if coverage < WARN_BELOW_COVERAGE:
+    if not raster_bbox > target_bbox:
         warnings.warn(f"""
-Insufficient overlap ({coverage:.1%}, expected {WARN_BELOW_COVERAGE:.0%}) between input raster
-and target. CDO resample may result in (unintended) NA values in the output.
-Consider using MemoryRaster.crop() or DataArray.sel() to match extents of input
-raster and target raster; which should ideally only vary in grid cell size.
+Raster bbox should entirely cover target bbox to ensure no NA in CDO resample.
+If you cropped the raster from a larger one, you can use Bbox.enlarge() to
+increase the bbox size so that it covers the target raster or grid.
 
 Raster bounds: {raster_bbox}
 Target bounds: {target_bbox}
