@@ -23,6 +23,18 @@ COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
 X = TypeVar("X", xr.DataArray, xr.Dataset)
 
 
+def read_raster(file: str | Path) -> xr.Dataset | xr.DataArray:
+    match Path(file).suffix:
+        case ".nc":
+            rast = xr.open_dataset(file)
+            return fix_lonlat(rast)
+        case ".tif":
+            rast = read_geotiff(file)
+            return fix_lonlat(rast)
+        case _:
+            raise ValueError(f"Unsupported file format: {file}")
+
+
 def bbox_from_region(region: str, integer_bounds: bool = False) -> Bbox:
     if "," in region:
         # try processing as a bbox
@@ -30,11 +42,8 @@ def bbox_from_region(region: str, integer_bounds: bool = False) -> Bbox:
     elif region.endswith(".shp"):  # crop to shapefile
         vec = gpd.read_file(region)
         bbox = Bbox(*vec.total_bounds)
-    elif region.endswith(".nc"):
-        rast = xr.open_dataset(region)
-        bbox = Bbox.from_xarray(rast)
-    elif region.endswith(".tif"):
-        rast = read_geotiff(region)
+    elif region.endswith(".nc") or region.endswith(".tif"):
+        rast = read_raster(region)
         bbox = Bbox.from_xarray(rast)
     else:
         raise ValueError("Unsupported region, must be one of .shp, .tif, .nc or a bbox")
