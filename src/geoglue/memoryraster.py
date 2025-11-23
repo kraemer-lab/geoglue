@@ -18,6 +18,7 @@ import pyproj
 import xarray as xr
 import copy
 import dataclasses
+import warnings
 from typing import Callable
 from pathlib import Path
 from contextlib import contextmanager
@@ -40,6 +41,13 @@ from .types import CdoGriddes, Bbox
 from .util import sha256
 
 DEFAULT_COLORMAP = "viridis"
+
+warnings.warn(
+    "geoglue.memoryraster is deprecated and will be removed in geoglue in its initial release, "
+    "use geoglue.util.read_geotiff() and xarray.DataArray functions to work with .tif rasters",
+    FutureWarning,
+    stacklevel=2,
+)
 
 
 def grid_size(da: xr.DataArray, axis: str) -> float:

@@ -64,6 +64,12 @@ class Bbox(NamedTuple):
         return shapely.geometry.box(self.minx, self.miny, self.maxx, self.maxy)
 
     @property
+    def safe_name(self) -> str:
+        return f"{self.minx}_{self.miny}_{self.maxx}_{self.maxy}".replace(
+            ".", "p"
+        ).replace("-", "m")
+
+    @property
     def geodetic_area_km2(self) -> float:
         lons = [self.minx, self.maxx, self.maxx, self.minx, self.minx]
         lats = [self.miny, self.miny, self.maxy, self.maxy, self.miny]
@@ -100,9 +106,9 @@ class Bbox(NamedTuple):
     def from_xarray(da: xr.DataArray | xr.Dataset) -> Bbox:
         coords = set(da.coords)
         c_lon, c_lat = None, None
-        if {"lon", "lat"} < coords:
+        if {"lon", "lat"} <= coords:
             c_lon, c_lat = "lon", "lat"
-        if {"longitude", "latitude"} < coords:
+        if {"longitude", "latitude"} <= coords:
             c_lon, c_lat = "longitude", "latitude"
         if c_lon is None and c_lat is None:
             raise ValueError("""Can only convert from DataArray or Dataset that has
@@ -236,8 +242,16 @@ class CdoGriddes:
             new_out.update(kwargs)
         return CdoGriddes(**out)
 
+    def get_bbox(self) -> Bbox:
+        yfirst, ylast = self.yfirst, self.yfirst + self.yinc * self.ysize
+        if yfirst > ylast:
+            miny, maxy = ylast, yfirst
+        else:
+            miny, maxy = yfirst, ylast
+        return Bbox(self.xfirst, miny, self.xfirst + self.xinc * self.xsize, maxy)
+
     @staticmethod
-    def from_dataset(ds: xr.Dataset) -> CdoGriddes:
+    def from_dataset(ds: xr.Dataset | xr.DataArray) -> CdoGriddes:
         with tempfile.NamedTemporaryFile(prefix="geoglue-", suffix=".nc") as f:
             ds.to_netcdf(f.name)
             return CdoGriddes.from_file(f.name)

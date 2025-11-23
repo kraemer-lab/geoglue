@@ -1,9 +1,11 @@
 "Utility functions for geoglue"
 
+import re
 import logging
 import hashlib
 import datetime
 from pathlib import Path
+from typing import TypeVar
 import shutil
 
 import xarray as xr
@@ -12,9 +14,75 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 
+from geoglue.types import Bbox
+
 logger = logging.getLogger(__name__)
 
 COMPRESSED_FILE_EXTS = [".tar.gz", ".tar.bz2", ".zip"]
+
+X = TypeVar("X", xr.DataArray, xr.Dataset)
+
+
+def bbox_from_region(region: str, integer_bounds: bool = False) -> Bbox:
+    if "," in region:
+        # try processing as a bbox
+        bbox = Bbox.from_string(region)
+    elif region.endswith(".shp"):  # crop to shapefile
+        vec = gpd.read_file(region)
+        bbox = Bbox(*vec.total_bounds)
+    elif region.endswith(".nc"):
+        rast = xr.open_dataset(region)
+        bbox = Bbox.from_xarray(rast)
+    elif region.endswith(".tif"):
+        rast = read_geotiff(region)
+        bbox = Bbox.from_xarray(rast)
+    else:
+        raise ValueError("Unsupported region, must be one of .shp, .tif, .nc or a bbox")
+    return bbox if not integer_bounds else bbox.int()
+
+
+def fix_lonlat(ds: X) -> X:
+    if ds.longitude.max() > 180:
+        ds = sort_lonlat(ds)
+    set_lonlat_attrs(ds)
+    return ds
+
+
+def read_geotiff(path: str | Path) -> xr.DataArray:
+    da = xr.open_dataarray(path).squeeze()
+    if "x" in da.coords and "y" in da.coords:
+        da = da.rename({"x": "longitude", "y": "latitude"})
+    return fix_lonlat(da)
+
+
+def logfmt_escape(value: str | Path | None) -> str:
+    """
+    Escape a string for logfmt-safe output
+
+    Examples:
+        logfmt_escape("ok") -> "ok"
+        logfmt_escape("has space") -> "\"has space\""
+        logfmt_escape("weird=\"val\"") -> "\"weird=\\\"val\\\"\""
+    """
+    if value is None:
+        return '""'
+
+    s = str(value)
+    # check if quoting is needed
+    if re.search(r'[\s="\\]', s):
+        s = s.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{s}"'
+    return s
+
+
+def write_variables(ds: xr.Dataset, path: Path) -> list[Path]:
+    folder = path.parent
+    out = []
+    for var in ds.data_vars:
+        var_path = folder / f"{path.stem}.{var}.nc"
+        ds[var].to_netcdf(var_path)
+        out.append(var_path)
+    return out
 
 
 def get_first_monday(year: int) -> datetime.date:
@@ -76,16 +144,17 @@ def crop_dataset_to_geometry(ds: xr.Dataset, geom: gpd.GeoDataFrame) -> xr.Datas
     return ds
 
 
-def sort_lonlat(ds: xr.Dataset) -> xr.Dataset:
+def sort_lonlat(ds: X) -> X:
     "Sorts longitude to -180 - 180 and latitude in descending order"
     if float(ds.coords["longitude"].max()) > 180:
         ds.coords["longitude"] = (ds.coords["longitude"] + 180) % 360 - 180
         ds = ds.sortby(ds.longitude)
     ds = ds.sortby(ds.latitude, ascending=False)
+    set_lonlat_attrs(ds)
     return ds
 
 
-def set_lonlat_attrs(ds: xr.Dataset):
+def set_lonlat_attrs(ds: xr.Dataset | xr.DataArray):
     """Sets CF-compliant grid attributes
 
     Sets grid attributes so that cdo can recognise the grid as `lonlat`
