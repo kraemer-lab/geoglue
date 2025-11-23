@@ -81,8 +81,7 @@ class Bbox(NamedTuple):
     def coverage_fraction(self, other: Bbox) -> float:
         if self.__ge__(other):
             return 1.0
-        else:
-            self.overlap_fraction(other)
+        return self.overlap_fraction(other)
 
     def __str__(self) -> str:
         return f"{self.minx},{self.miny},{self.maxx},{self.maxy}"
@@ -129,15 +128,15 @@ coordinates named lat, lon or latitude, longitude""")
         miny = to_num(values.pop())
         minx = to_num(values.pop())
         return Bbox(minx, miny, maxx, maxy)
-    
+
     @property
     def lat_slice(self) -> slice:
         return slice(self.maxy, self.miny)
-    
+
     @property
     def lon_slice(self) -> slice:
         return slice(self.minx, self.maxx)
-    
+
     def to_list(self, spec: str) -> list[int | float]:
         """Returns Bbox converted to list of numbers in different order
 
