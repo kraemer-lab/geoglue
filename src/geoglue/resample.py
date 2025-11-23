@@ -17,7 +17,7 @@ warnings.filterwarnings("ignore", category=FutureWarning, message=r".*MemoryRast
 
 from .memoryraster import MemoryRaster  # noqa
 
-WARN_BELOW_OVERLAP = 0.8
+WARN_BELOW_COVERAGE = 0.8
 
 
 def resample(
@@ -55,11 +55,11 @@ def resample(
     infile_hash = sha256(infile, prefix=True)
     raster_bbox = Bbox.from_xarray(xr.open_dataset(infile, decode_timedelta=True))
     target_bbox = target.bbox if isinstance(target, MemoryRaster) else target.get_bbox()
-    if (overlap := raster_bbox.overlap_fraction(target_bbox)) == 0:
+    if (coverage := raster_bbox.coverage_fraction(target_bbox)) == 0:
         raise ValueError("No intersection between input raster and target")
-    if overlap < WARN_BELOW_OVERLAP:
+    if coverage < WARN_BELOW_COVERAGE:
         warnings.warn(f"""
-Insufficient overlap ({overlap:.1%}, expected {WARN_BELOW_OVERLAP:.0%}) between input raster
+Insufficient overlap ({coverage:.1%}, expected {WARN_BELOW_COVERAGE:.0%}) between input raster
 and target. CDO resample may result in (unintended) NA values in the output.
 Consider using MemoryRaster.crop() or DataArray.sel() to match extents of input
 raster and target raster; which should ideally only vary in grid cell size.

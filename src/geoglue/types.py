@@ -84,6 +84,11 @@ class Bbox(NamedTuple):
             self.geodetic_area_km2, other.geodetic_area_km2
         )
 
+    def coverage_fraction(self, other: Bbox) -> float:
+        if self.__ge__(other):
+            return 1.0
+        return self.overlap_fraction(other)
+
     def __str__(self) -> str:
         return f"{self.minx},{self.miny},{self.maxx},{self.maxy}"
 
