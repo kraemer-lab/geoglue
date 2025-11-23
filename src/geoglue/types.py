@@ -60,6 +60,10 @@ class Bbox(NamedTuple):
         maxx = self.maxx if isinstance(self.maxx, int) else math.ceil(self.maxx)
         return Bbox(minx, miny, maxx, maxy)
 
+    def enlarge(self, by: int | float) -> Bbox:
+        "Enlarges a Bbox by the same extent in all directions"
+        return Bbox(self.minx - by, self.miny - by, self.maxx + by, self.maxy + by)
+
     def as_polygon(self) -> shapely.geometry.Polygon:
         return shapely.geometry.box(self.minx, self.miny, self.maxx, self.maxy)
 
