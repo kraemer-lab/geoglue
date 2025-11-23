@@ -62,7 +62,11 @@ def _slice_extract_core(
             output="pandas",
         )  # type: ignore
         val = res["weighted_sum"] / res["count"]
-    return val.values.squeeze()
+    ret = val.values.squeeze()
+    if ret.shape == ():  # only one region, must return a array
+        return np.array([ret])
+    else:
+        return ret
 
 
 def zonalstats(
