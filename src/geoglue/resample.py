@@ -55,7 +55,7 @@ def resample(
     infile_hash = sha256(infile, prefix=True)
     raster_bbox = Bbox.from_xarray(xr.open_dataset(infile, decode_timedelta=True))
     target_bbox = target.bbox if isinstance(target, MemoryRaster) else target.get_bbox()
-    if (coverage := raster_bbox.coverage_fraction(target.bbox)) == 0:
+    if (coverage := raster_bbox.coverage_fraction(target_bbox)) == 0:
         raise ValueError("No intersection between input raster and target")
     if coverage < WARN_BELOW_COVERAGE:
         warnings.warn(f"""
