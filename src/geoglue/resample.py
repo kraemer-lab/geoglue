@@ -19,7 +19,7 @@ from .memoryraster import MemoryRaster  # noqa
 WARN_BELOW_COVERAGE = 0.8
 
 
-def resample_sparse(
+def remapbil_sparse(
     infile: str | Path,
     griddes_file: str,
     outfile: str | Path | None = None,
@@ -160,7 +160,7 @@ Target bounds: {target_bbox}
             case "remapdis":
                 _cdo.remapdis(griddes.name, input=str(infile), output=str(outfile))
             case "sremapbil":
-                return resample_sparse(infile, griddes.name, outfile)
+                return remapbil_sparse(infile, griddes.name, outfile)
 
     return Path(outfile)
 
