@@ -9,11 +9,11 @@ import click
 import xarray as xr
 import warnings
 
-from geoglue.validate import stats_nonregion
 
 from .types import Bbox
 from .util import bbox_from_region, read_raster, write_variables, read_geotiff
 from .zonalstats import compute_config
+from .validate import print_file_stats
 from .config import (
     ResampleType,
     ShapefileConfig,
@@ -42,11 +42,13 @@ def cli(ctx: click.Context, verbose: int) -> None:
     ctx.obj = {"verbose": verbose}
 
 
-@cli.command("validate", help="Shows validation info for a zonalstats processed file")
-@click.argument("file", type=click.Path(exists=True, dir_okay=False, readable=True))
-def validate(file: str):
-    da = xr.open_dataarray(file)
-    stats_nonregion(da)
+@cli.command("stats", help="Shows statistics for a zonalstats file (.zs.nc)")
+@click.argument(
+    "files", nargs=-1, type=click.Path(exists=True, dir_okay=False, readable=True)
+)
+def stats(files: tuple[str]):
+    for file in files:
+        print_file_stats(Path(file))
 
 
 @cli.command(
