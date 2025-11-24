@@ -13,6 +13,13 @@ class VariableStatistics(NamedTuple):
     max: float
 
 
+class Statistics(NamedTuple):
+    nna: int
+    mean: float
+    min: float
+    max: float
+
+
 class CoordStatistics(NamedTuple):
     coord: CoordinateValue
     stat: VariableStatistics
@@ -26,6 +33,15 @@ class DataArrayStatistics(NamedTuple):
     name: str
     nna: int  # number of NA values
     coord_stats: list[CoordStatistics]
+
+
+def minimal_stats(da: xr.DataArray) -> Statistics:
+    return Statistics(
+        nna=da.isnull().sum().item(),
+        mean=da.mean().item(),
+        max=da.max().item(),
+        min=da.min().item(),
+    )
 
 
 def stats(
@@ -60,14 +76,28 @@ def stats(
     return DataArrayStatistics(name, nna, out)
 
 
+def array_size(da: xr.DataArray) -> str:
+    return " ".join(f"{k}={v}" for k, v in da.sizes.items())
+
+
 def print_file_stats(file: Path):
     ds = xr.open_dataset(file)
     for var in sorted(ds.data_vars):
-        st = stats(ds[var])
-        nna = st.nna
-        if nna == 0:
-            print(f"\033[1m{file.name}:{var}: nna={nna}\033[0m")
+        size_str = array_size(ds[var])
+        if "region" in ds[var].dims:
+            st = stats(ds[var])
+            nna = st.nna
+            if nna == 0:
+                print(f"\033[1m{file.name}:{var}: nna={nna}\033[0m")
+            else:
+                print(f"\033[1m{file.name}:{var}: nna=\033[1;91{nna}\033[0m")
+            print(f"{file.name}:{var}: \033[0;36m{size_str}\033[0m")
+            for coord_stat in st.coord_stats:
+                print(f"{file.name}:{var}: {coord_stat}")
         else:
-            print(f"\033[1m{file.name}:{var}: nna=\033[1;91{nna}\033[0m")
-        for coord_stat in st.coord_stats:
-            print(f"{file.name}:{var}: {coord_stat}")
+            ms = minimal_stats(ds[var])
+            print(f"\033[1m{file.name}:{var}: nna={ms.nna}\033[0m")
+            print(f"{file.name}:{var}: \033[0;34m{size_str}\033[0m")
+            print(
+                f"{file.name}:{var}: mean={ms.mean:.5f}\tmin={ms.min:.5f}\tmax={ms.max:.5f}"
+            )
