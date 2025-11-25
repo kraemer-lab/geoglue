@@ -31,7 +31,6 @@ class CoordStatistics(NamedTuple):
 
 class DataArrayStatistics(NamedTuple):
     name: str
-    nna: int  # number of NA values
     coord_stats: list[CoordStatistics]
 
 
@@ -54,7 +53,6 @@ def stats(
         raise ValueError(
             "Not a zonalstats file (.zs.nc), must have the 'region' coordinate"
         )
-    nna = da.isnull().sum().item()
     non_region_dims = [dim for dim in da.dims if dim != "region"]
     dim_index_ranges = {dim: range(da.sizes[dim]) for dim in non_region_dims}
 
@@ -73,31 +71,28 @@ def stats(
             )
         )
     name = str(da.name) if da.name else "var"
-    return DataArrayStatistics(name, nna, out)
+    return DataArrayStatistics(name, out)
 
 
 def array_size(da: xr.DataArray) -> str:
     return " ".join(f"{k}={v}" for k, v in da.sizes.items())
 
 
-def print_file_stats(file: Path):
+def print_file_stats(file: Path, verbose: bool = False):
     ds = xr.open_dataset(file)
     for var in sorted(ds.data_vars):
         size_str = array_size(ds[var])
+        ms = minimal_stats(ds[var])
+        ms_str = f"mean={ms.mean:.5f} min={ms.min:.5f} max={ms.max:.5f}"
+        if ms.nna == 0:
+            print(f"\033[1m{file}:{var}: nna={ms.nna}\033[0m {ms_str}")
+        else:
+            print(f"\033[1m{file}:{var}: nna=\033[1;91m{ms.nna}\033[0m {ms_str}")
         if "region" in ds[var].dims:
             st = stats(ds[var])
-            nna = st.nna
-            if nna == 0:
-                print(f"\033[1m{file.name}:{var}: nna={nna}\033[0m")
-            else:
-                print(f"\033[1m{file.name}:{var}: nna=\033[1;91{nna}\033[0m")
-            print(f"{file.name}:{var}: \033[0;36m{size_str}\033[0m")
-            for coord_stat in st.coord_stats:
-                print(f"{file.name}:{var}: {coord_stat}")
+            print(f"{file}:{var}: \033[0;36m{size_str}\033[0m")
+            if verbose:
+                for coord_stat in st.coord_stats:
+                    print(f"{file}:{var}: {coord_stat}")
         else:
-            ms = minimal_stats(ds[var])
-            print(f"\033[1m{file.name}:{var}: nna={ms.nna}\033[0m")
-            print(f"{file.name}:{var}: \033[0;34m{size_str}\033[0m")
-            print(
-                f"{file.name}:{var}: mean={ms.mean:.5f}\tmin={ms.min:.5f}\tmax={ms.max:.5f}"
-            )
+            print(f"{file}:{var}: \033[0;34m{size_str}\033[0m")

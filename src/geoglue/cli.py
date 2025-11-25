@@ -46,9 +46,11 @@ def cli(ctx: click.Context, verbose: int) -> None:
 @click.argument(
     "files", nargs=-1, type=click.Path(exists=True, dir_okay=False, readable=True)
 )
-def stats(files: tuple[str]):
+@click.pass_context
+def stats(ctx: click.Context, files: tuple[str]):
+    verbose = ctx.obj["verbose"] > 0
     for file in files:
-        print_file_stats(Path(file))
+        print_file_stats(Path(file), verbose=verbose)
 
 
 @cli.command(
