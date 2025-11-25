@@ -2,6 +2,7 @@
 
 import datetime
 import tempfile
+import fileinput
 from pathlib import Path
 
 from cdo import Cdo
@@ -9,8 +10,8 @@ import click
 import xarray as xr
 import warnings
 
-
 from .types import Bbox
+from .merge import merge_datasets
 from .util import bbox_from_region, read_raster, write_variables, read_geotiff
 from .zonalstats import compute_config
 from .validate import print_file_stats
@@ -40,6 +41,21 @@ def cli(ctx: click.Context, verbose: int) -> None:
     """
     # store verbosity in context for downstream commands (if needed)
     ctx.obj = {"verbose": verbose}
+
+
+@cli.command("merge", help="Merges datasets specified on standard input")
+@click.option("--dim", help="Dimension to concatenate on", default="time")
+@click.option("-o", "--output", help="Output file to write to", required=True)
+@click.option(
+    "--file",
+    help="Merge file to use",
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+)
+def merge(dim: str, output: str, file: str):
+    file = "-" if file is None else file
+    ds = merge_datasets(fileinput.input(file, encoding="utf-8"), dim=dim)
+    ds.to_netcdf(output)
+    print(output)
 
 
 @cli.command("stats", help="Shows statistics for a zonalstats file (.zs.nc)")
