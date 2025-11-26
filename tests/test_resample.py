@@ -1,5 +1,6 @@
 import xarray as xr
 import numpy as np
+from pathlib import Path
 
 from geoglue.resample import resample, resampled_dataset
 from geoglue.memoryraster import MemoryRaster
@@ -32,20 +33,27 @@ def test_resampled_dataset(resampling, population_1km):
 
 def test_resample_sparse_vs_resample():
     weights = read_geotiff("data/SGP/sgp_pop_2015_CN_1km_R2025A_UA_v1.tif")
+
+    # Normalised Difference Vegetation Index is ubyte with 255 representing
+    # NaN with a scale_factor and add_offset. This is not read correctly
+    # by xarray at the moment, so we set NaNs explicitly
     source = xr.open_dataarray("data/SGP/SGP-ndvi-2015.nc")
     orig = xr.where(source <= 0.93, source, np.nan)
     orig = fix_lonlat(orig)
     orig.to_netcdf("data/SGP/SGP-ndvi-2015_na.nc")
-    print("Wrote NDVI file with NaN")
+
+    # Resample using both remapbil and sremapbil
+    cleanup = [Path("data/SGP/SGP-ndvi-2015_na.nc")]
     griddes = CdoGriddes.from_dataset(weights)
-    remapbil = xr.open_dataarray(
-        resample("remapbil", "data/SGP/SGP-ndvi-2015_na.nc", griddes, skip_exists=False)
+    remapbil_path = resample(
+        "remapbil", "data/SGP/SGP-ndvi-2015_na.nc", griddes, skip_exists=False
     )
-    sremapbil = xr.open_dataarray(
-        resample(
-            "sremapbil", "data/SGP/SGP-ndvi-2015_na.nc", griddes, skip_exists=False
-        )
+    sremapbil_path = resample(
+        "sremapbil", "data/SGP/SGP-ndvi-2015_na.nc", griddes, skip_exists=False
     )
+    cleanup.extend([remapbil_path, sremapbil_path])
+    remapbil = xr.open_dataarray(remapbil_path)
+    sremapbil = xr.open_dataarray(sremapbil_path)
 
     # Resampling method should not affect shape
     assert remapbil.shape == sremapbil.shape == (37, 59)
@@ -58,3 +66,7 @@ def test_resample_sparse_vs_resample():
     # Any coordinate which is non-NA in remapbil should also
     # be non-NA in sremapbil
     assert (remapbil_nna & ~sremapbil_nna).sum().item() == 0
+
+    for c in cleanup:
+        if c.exists():
+            c.unlink()
