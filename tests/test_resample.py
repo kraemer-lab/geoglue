@@ -1,8 +1,9 @@
 import xarray as xr
+import numpy as np
 
 from geoglue.resample import resample, resampled_dataset
 from geoglue.memoryraster import MemoryRaster
-from geoglue.util import read_geotiff
+from geoglue.util import fix_lonlat, read_geotiff
 from geoglue.types import CdoGriddes
 
 import pytest
@@ -31,7 +32,11 @@ def test_resampled_dataset(resampling, population_1km):
 
 def test_resample_sparse_vs_resample():
     weights = read_geotiff("data/SGP/sgp_pop_2015_CN_1km_R2025A_UA_v1.tif")
-    # source = xr.open_dataarray("data/SGP/SGP-ndvi-2015.nc")
+    source = xr.open_dataarray("data/SGP/SGP-ndvi-2015.nc")
+    orig = xr.where(source <= 0.93, source, np.nan)
+    orig = fix_lonlat(orig)
+    orig.to_netcdf("data/SGP/SGP-ndvi-2015_na.nc")
+    print("Wrote NDVI file with NaN")
     griddes = CdoGriddes.from_dataset(weights)
     remapbil = xr.open_dataarray(
         resample("remapbil", "data/SGP/SGP-ndvi-2015_na.nc", griddes, skip_exists=False)

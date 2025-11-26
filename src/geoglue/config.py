@@ -15,7 +15,7 @@ from geoglue.util import logfmt_escape
 logger = logging.getLogger(__name__)
 
 # Allowed resample operations (extendable)
-ResampleType = typing.Literal["remapbil", "remapdis", "off"]
+ResampleType = typing.Literal["remapbil", "remapdis", "sremapbil", "off"]
 
 DEFAULT_PATH = Path("geoglue-config.toml")
 

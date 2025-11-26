@@ -213,7 +213,7 @@ def zonalstats(
     tmp_path = tmp or gcfg.tmp_path
     if isinstance(tmp_path, str):
         tmp_path = Path(tmp_path)
-    if resample not in ["remapbil", "remapdis", "off"]:
+    if resample not in ["remapbil", "remapdis", "sremapbil", "off"]:
         raise ValueError("Unsupported method {resample=}")
     if "::" in region:
         shp = ShapefileConfig.from_str(region)

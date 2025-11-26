@@ -22,10 +22,9 @@ WARN_BELOW_COVERAGE = 0.8
 def remapbil_sparse(
     infile: str | Path,
     griddes_file: str,
-    outfile: str | Path | None = None,
+    outfile: str | Path,
     eps: float = 1e-6,
     tmp_path: Path = Path("."),
-    skip_exists=True,
 ) -> Path:
     """Sparse bilinear resampling
 
@@ -38,18 +37,16 @@ def remapbil_sparse(
 
     Parameters
     ----------
-    data
+    infile
         Input data file or xarray.DataArray
     griddes
         Target griddes file
-    eps
-        epsilon value that is used as a threshold for mask
     outfile
         Output resampled file path, if not specified, generated from infile by
+    eps
+        epsilon value that is used as a threshold for mask
     tmp_path
         Temporary folder to use for intermediate files, defaults to $CWD
-    skip_exists
-        Whether to skip resampling if outfile exists (default=True)
 
     Returns
     -------
@@ -59,9 +56,6 @@ def remapbil_sparse(
 
     _cdo = cdo.Cdo()
     infile = Path(infile)
-    outfile = outfile or infile.parent / f"{infile.stem}_sremapbil.nc"
-    if Path(outfile).exists() and skip_exists:
-        return Path(outfile)
     da = xr.open_dataarray(infile)
 
     fill = da.fillna(0)
@@ -69,8 +63,8 @@ def remapbil_sparse(
 
     fill.to_netcdf(infile_fill := tmp_path / f"{infile.stem}_fill.nc")
     mask.to_netcdf(infile_mask := tmp_path / f"{infile.stem}_mask.nc")
-    outfile_fill = infile.parent / f"{infile.stem}_remapbil_fill.nc"
-    outfile_mask = infile.parent / f"{infile.stem}_remapbil_mask.nc"
+    outfile_fill = tmp_path / f"{infile.stem}_remapbil_fill.nc"
+    outfile_mask = tmp_path / f"{infile.stem}_remapbil_mask.nc"
 
     if not outfile_fill.exists():
         _cdo.remapbil(griddes_file, input=str(infile_fill), output=str(outfile_fill))
@@ -160,7 +154,10 @@ Target bounds: {target_bbox}
             case "remapdis":
                 _cdo.remapdis(griddes.name, input=str(infile), output=str(outfile))
             case "sremapbil":
-                return remapbil_sparse(infile, griddes.name, outfile)
+                with tempfile.TemporaryDirectory(prefix="geoglue-") as tmp:
+                    return remapbil_sparse(
+                        infile, griddes.name, outfile, tmp_path=Path(tmp)
+                    )
 
     return Path(outfile)
 
