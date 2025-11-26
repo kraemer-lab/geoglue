@@ -238,7 +238,7 @@ def is_lonlat(data: str | Path | xr.Dataset | xr.DataArray) -> bool:
         ds = xr.open_dataset(data)
     else:
         ds = data
-    return {"longitude", "latitude"} < set(ds.coords)
+    return {"longitude", "latitude"} <= set(ds.coords)
 
 
 def get_extents(gdf: gpd.GeoDataFrame) -> tuple[slice, slice]:
