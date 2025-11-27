@@ -177,7 +177,9 @@ def crop(
 )
 @click.option(
     "--resample",
-    type=click.Choice(["remapdis", "remapbil", "off"], case_sensitive=True),
+    type=click.Choice(
+        ["remapdis", "remapbil", "sremapbil", "off"], case_sensitive=True
+    ),
     default="off",
     show_default=True,
     help="Resampling strategy to apply when required",
