@@ -10,6 +10,8 @@ import click
 import xarray as xr
 import warnings
 
+from geoglue.plot import plot
+
 from .types import Bbox
 from .merge import merge_datasets
 from .util import bbox_from_region, read_raster, write_variables, read_geotiff
@@ -41,6 +43,39 @@ def cli(ctx: click.Context, verbose: int) -> None:
     """
     # store verbosity in context for downstream commands (if needed)
     ctx.obj = {"verbose": verbose}
+
+
+@cli.command("plot", help="Plot datasets")
+@click.argument("file")
+@click.option("-c", "--cmap", help="Colour map", default="viridis")
+@click.option("-i", "--isel", help="Non-spatial index to select", default="0")
+@click.option("-v", "--var", help="Variable to select")
+@click.option(
+    "-o", "--output", help="Filename to save plot, show in terminal otherwise"
+)
+@click.option("-g", "--geometry", help="Geometry file or path to use", default=".")
+def cli_plot(
+    file: str,
+    cmap: str,
+    isel: str,
+    var: str | None,
+    output: str | None,
+    geometry: str,
+):
+    ds = xr.open_dataset(file)
+    vars = list(ds.data_vars)
+    if len(vars) > 1 and var is None:
+        raise ValueError(f"Use -v (--var) to select a variable from {vars}")
+    variable = var or vars[0]
+    da = ds[variable]
+
+    isel_val: int | tuple = 0
+    if "," not in isel:
+        isel_val = int(isel)
+    else:
+        isel_val = tuple(map(int, isel.split(",")))
+
+    plot(da, isel_val, cmap, output, geometry)
 
 
 @cli.command("merge", help="Merges datasets specified on standard input")
