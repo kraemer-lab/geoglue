@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from geoglue.config import GeoglueConfig, ShapefileConfig, read_config
+from geoglue.config import GeoglueConfig, ShapefileConfig, ZonalStatsConfig, read_config
 
 area_weighted_sum = {
     "area_weighted_sum": "area_weighted_sum(coverage_weight=area_spherical_km2,default_weight=0)"
@@ -20,6 +20,28 @@ geoglue_config = GeoglueConfig(
 def test_shapefile_config():
     assert ShapefileConfig.from_str("VNM-2.shp::GID_2") == ShapefileConfig(
         Path("VNM-2.shp"), "GID_2"
+    )
+
+
+def test_zonalstats_config_from_str():
+    config = [
+        "raster=data/country/BRA-2015-gdp_pc.nc",
+        "shapefile=data/geometry/BR_Municipios_2023.shp",
+        "shapefile_id=CD_MUN",
+        "output=BRA-2015-gdp_pc.zs.nc",
+        "operation=weighted_mean(coverage_weight=area_spherical_km2,default_weight=0)",
+        "weights=data/worldpop/bra_pop_2015_CN_1km_R2025A_UA_v1.tif",
+        "resample=sremapbil",
+    ]
+    config_str = " ".join(config)
+    assert ZonalStatsConfig.from_str(config_str) == ZonalStatsConfig(
+        raster=Path("data/country/BRA-2015-gdp_pc.nc"),
+        shapefile=Path("data/geometry/BR_Municipios_2023.shp"),
+        shapefile_id="CD_MUN",
+        output=Path("BRA-2015-gdp_pc.zs.nc"),
+        operation="weighted_mean(coverage_weight=area_spherical_km2,default_weight=0)",
+        weights=Path("data/worldpop/bra_pop_2015_CN_1km_R2025A_UA_v1.tif"),
+        resample="sremapbil",
     )
 
 

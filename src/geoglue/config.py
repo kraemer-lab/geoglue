@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 import os
+import shlex
 import typing
 import logging
 import tomllib as toml
@@ -156,6 +157,42 @@ class ZonalStatsConfig:
                 _weights,
                 f"resample={self.resample}",
             ]
+        )
+
+    @staticmethod
+    def from_str(s: str) -> ZonalStatsConfig:
+        parts = shlex.split(s)
+        kv = {}
+        required_keys = [
+            "raster",
+            "shapefile",
+            "shapefile_id",
+            "output",
+            "operation",
+            "resample",
+        ]
+
+        for p in parts:
+            k, _, v = p.partition("=")
+            kv[k] = v
+        if any(k not in kv for k in required_keys):
+            raise KeyError(f"Missing required key, should have {required_keys}")
+        _raster = Path(kv["raster"])
+        _shapefile = Path(kv["shapefile"])
+        _shapefile_id = kv["shapefile_id"]
+        _output = Path(kv["output"])
+        _op = kv["operation"]
+        _resample = kv["resample"]
+        _weights = kv.get("weights")
+        _weights = Path(_weights) if isinstance(_weights, str) else None
+        return ZonalStatsConfig(
+            raster=_raster,
+            shapefile=_shapefile,
+            shapefile_id=_shapefile_id,
+            output=_output,
+            operation=_op,
+            resample=_resample,
+            weights=_weights,
         )
 
 
