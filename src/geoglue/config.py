@@ -6,9 +6,10 @@ import shlex
 import typing
 import logging
 import tomllib as toml
-import geopandas as gpd
 from dataclasses import dataclass
 from pathlib import Path
+
+import geopandas as gpd
 
 from geoglue.types import Bbox
 from geoglue.util import logfmt_escape
@@ -194,6 +195,16 @@ class ZonalStatsConfig:
             resample=_resample,
             weights=_weights,
         )
+
+
+def read_zonalstats_config(
+    config: str,
+) -> ZonalStatsConfig | list[ZonalStatsConfig] | None:
+    lines = config.splitlines()
+    if len(lines) == 1:
+        return ZonalStatsConfig.from_str(lines[0])
+    else:
+        return [ZonalStatsConfig.from_str(line) for line in lines]
 
 
 def read_config(config: str | Path | None) -> GeoglueConfig:
