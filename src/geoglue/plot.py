@@ -7,7 +7,7 @@ import xarray as xr
 import geopandas as gpd
 import matplotlib.pyplot as plt
 
-from .config import ZonalStatsConfig
+from .config import read_zonalstats_config
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +44,17 @@ def plot(
     if "geoglue_config" in da.attrs:
         print("Detected zonalstats file with geoglue_config attribute")
         # try to read geometry from config
-        cfg = ZonalStatsConfig.from_str(da.attrs["geoglue_config"])
+        cfg_str = da.attrs["geoglue_config"]
+        cfg = read_zonalstats_config(cfg_str)
+        if cfg is None:
+            raise ValueError(f"Invalid geoglue_config attr found: {cfg_str!r}")
+        if isinstance(cfg, list):  # pick the geometry from the first one
+            shapefile = cfg[0].shapefile
+        else:
+            shapefile = cfg.shapefile
         if geometry_path.is_dir():
             # try loading shapefile relative to dir
-            geom = gpd.read_file(geometry_path / cfg.shapefile)
+            geom = gpd.read_file(geometry_path / shapefile)
         else:
             geom = gpd.read_file(geometry_path)
 
