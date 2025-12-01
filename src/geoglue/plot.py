@@ -28,18 +28,19 @@ def plot(
         for c in da.coords
         if c not in ["lat", "lon", "latitude", "longitude", "region"]
     ]
-    if len(non_region_coords) == 1:
-        isel_val = isel if isinstance(isel, int) else isel[0]
-        isel_kwargs = {non_region_coords[0]: isel_val}
-    else:
-        assert isinstance(isel, tuple)
-        if len(isel) != len(non_region_coords):
-            raise ValueError(
-                "isel must be a tuple of indices representing the lat/lon raster to select"
-            )
-        isel_kwargs = dict(zip(non_region_coords, isel))
-    print("Selecting", isel_kwargs)
-    da = da.isel(**isel_kwargs)
+    if non_region_coords:
+        if len(non_region_coords) == 1:
+            isel_val = isel if isinstance(isel, int) else isel[0]
+            isel_kwargs = {non_region_coords[0]: isel_val}
+        else:
+            assert isinstance(isel, tuple)
+            if len(isel) != len(non_region_coords):
+                raise ValueError(
+                    "isel must be a tuple of indices representing the lat/lon raster to select"
+                )
+            isel_kwargs = dict(zip(non_region_coords, isel))
+        print("Selecting", isel_kwargs)
+        da = da.isel(**isel_kwargs)
 
     if "geoglue_config" in da.attrs:
         print("Detected zonalstats file with geoglue_config attribute")
