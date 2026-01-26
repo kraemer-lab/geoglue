@@ -57,6 +57,15 @@ def fix_lonlat(ds: X) -> X:
     return ds
 
 
+def read_ncdf(path: str | Path) -> xr.Dataset:
+    ds = xr.open_dataset(path)
+    if "lat" in ds.dims:
+        ds = ds.rename(lat="latitude")
+    if "lon" in ds.dims:
+        ds = ds.rename(lon="longitude")
+    return ds
+
+
 def read_geotiff(path: str | Path) -> xr.DataArray:
     da = xr.open_dataarray(path).squeeze()
     if "x" in da.coords and "y" in da.coords:
