@@ -12,6 +12,7 @@ import operator
 import re
 import warnings
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Literal, NamedTuple, Sequence
 
@@ -702,9 +703,9 @@ class DatasetPool:
         self.years = [
             int(x) for x in sorted(set(map(operator.itemgetter(1), match_groups)))
         ]
-        cur_year = int(datetime.datetime.today().year)
-        if cur_year in self.years:
-            self.years.remove(cur_year)
+        # cur_year = int(datetime.datetime.today().year)
+        # if cur_year in self.years:
+        #     self.years.remove(cur_year)
         self.part_chunks = sorted(set(map(operator.itemgetter(1), part_match_groups)))
         if len(stubs) > 1 or len(iso3) > 1:
             raise ValueError(
@@ -854,12 +855,20 @@ class DatasetPool:
                 ds, self.path(year + 1).as_dataset(), self.shift_hours, dim=time_dim
             )
         assert (ds.instant.coords[time_dim] == ds.accum.coords[time_dim]).all()
-        if time_coord.min().values != np.datetime64(
-            f"{year}-01-01"
-        ) or time_coord.max().values != np.datetime64(f"{year}-12-31T23"):
+        current_year = datetime.today().date().year
+        if time_coord.min().values != np.datetime64(f"{year}-01-01"):
             raise ValueError(
-                "Improper alignment error: time dimension bounds do not match year bounds"
+                "Improper alignment error: time dimension bounds do not match year bounds at year start"
             )
+        if year == current_year:
+            warnings.warn(
+                f"Aligning for current year {year}, please make sure it has at least 1 ISO week"
+            )
+        elif time_coord.max().values != np.datetime64(f"{year}-12-31T23"):
+            raise ValueError(
+                "Improper alignment error: time dimension bounds do not match year bounds at year end"
+            )
+
         return ds
 
     def weekly_reduce(
