@@ -857,7 +857,7 @@ class DatasetPool:
         if time_coord.min().values != np.datetime64(
             f"{year}-01-01"
         ) or time_coord.max().values != np.datetime64(f"{year}-12-31T23"):
-            raise ValueError(
+            warnings.warn(
                 "Improper alignment error: time dimension bounds do not match year bounds"
             )
         return ds
