@@ -12,6 +12,7 @@ import operator
 import re
 import warnings
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Literal, NamedTuple, Sequence
 
@@ -854,12 +855,20 @@ class DatasetPool:
                 ds, self.path(year + 1).as_dataset(), self.shift_hours, dim=time_dim
             )
         assert (ds.instant.coords[time_dim] == ds.accum.coords[time_dim]).all()
-        if time_coord.min().values != np.datetime64(
-            f"{year}-01-01"
-        ) or time_coord.max().values != np.datetime64(f"{year}-12-31T23"):
-            warnings.warn(
-                "Improper alignment error: time dimension bounds do not match year bounds"
+        current_year = datetime.today().date().year
+        if time_coord.min().values != np.datetime64(f"{year}-01-01"):
+            raise ValueError(
+                "Improper alignment error: time dimension bounds do not match year bounds at year start"
             )
+        if year == current_year:
+            warnings.warn(
+                f"Aligning for current year {year}, please make sure it has at least 1 ISO week"
+            )
+        elif time_coord.max().values != np.datetime64(f"{year}-12-31T23"):
+            raise ValueError(
+                "Improper alignment error: time dimension bounds do not match year bounds at year end"
+            )
+
         return ds
 
     def weekly_reduce(
