@@ -702,9 +702,9 @@ class DatasetPool:
         self.years = [
             int(x) for x in sorted(set(map(operator.itemgetter(1), match_groups)))
         ]
-        cur_year = int(datetime.datetime.today().year)
-        if cur_year in self.years:
-            self.years.remove(cur_year)
+        # cur_year = int(datetime.datetime.today().year)
+        # if cur_year in self.years:
+        #     self.years.remove(cur_year)
         self.part_chunks = sorted(set(map(operator.itemgetter(1), part_match_groups)))
         if len(stubs) > 1 or len(iso3) > 1:
             raise ValueError(
