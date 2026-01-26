@@ -12,7 +12,7 @@ import operator
 import re
 import warnings
 import zipfile
-from datetime import datetime
+import datetime
 from pathlib import Path
 from typing import Iterable, Literal, NamedTuple, Sequence
 
@@ -855,7 +855,7 @@ class DatasetPool:
                 ds, self.path(year + 1).as_dataset(), self.shift_hours, dim=time_dim
             )
         assert (ds.instant.coords[time_dim] == ds.accum.coords[time_dim]).all()
-        current_year = datetime.today().date().year
+        current_year = int(datetime.datetime.today().year)
         if time_coord.min().values != np.datetime64(f"{year}-01-01"):
             raise ValueError(
                 "Improper alignment error: time dimension bounds do not match year bounds at year start"
