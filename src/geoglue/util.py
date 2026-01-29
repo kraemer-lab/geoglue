@@ -51,9 +51,18 @@ def bbox_from_region(region: str, integer_bounds: bool = False) -> Bbox:
 
 
 def fix_lonlat(ds: X) -> X:
+    if "lat" in ds.dims:
+        ds = ds.rename(lat="latitude")
+    if "lon" in ds.dims:
+        ds = ds.rename(lon="longitude")
     if ds.longitude.max() > 180:
         ds = sort_lonlat(ds)
     set_lonlat_attrs(ds)
+    return ds
+
+
+def read_ncdf(path: str | Path) -> xr.Dataset:
+    ds = xr.open_dataset(path)
     return ds
 
 
