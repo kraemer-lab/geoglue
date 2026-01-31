@@ -166,7 +166,7 @@ Target bounds: {target_bbox}
 def resampled_dataset(
     resampling: Literal["remapbil", "remapdis"],
     data: str | Path | xr.Dataset,
-    target: MemoryRaster,
+    target: MemoryRaster | xr.DataArray,
 ) -> Iterator[xr.Dataset]:
     """Context manager version of :meth:`geoglue.resample.resample`.
 
@@ -177,7 +177,7 @@ def resampled_dataset(
     data
         Input file to read or xarray dataset
     target
-        Target MemoryRaster whose grid to resample to
+        Target MemoryRaster or xr.DataArray whose grid to resample to
 
     Yields
     ------
@@ -201,6 +201,9 @@ def resampled_dataset(
         infile_istempfile = Path(data), False
 
     with tempfile.NamedTemporaryFile(prefix="geoglue-", suffix=".nc") as f:
+        if isinstance(target, xr.DataArray):
+            # if xr.DataArray then convert to CdoGriddes before passing to resample()
+            target = CdoGriddes.from_dataset(target)
         resample(resampling, infile_istempfile[0], target, f.name, skip_exists=False)
         ds = xr.open_dataset(f.name, engine="netcdf4")
         yield ds
