@@ -12,7 +12,7 @@ def get_data_path() -> Path:
     else:
         data_path = Path.home() / ".local" / "share" / "geoglue"
     if not data_path.exists():
-        data_path.mkdir(parents=True)
+        data_path.mkdir(parents=True, exist_ok=True)
     return data_path
 
 
@@ -23,7 +23,7 @@ def get_cache_path() -> Path:
     else:
         cache_path = Path.home() / ".cache" / "geoglue"
     if not cache_path.exists():
-        cache_path.mkdir(parents=True)
+        cache_path.mkdir(parents=True, exist_ok=True)
     return cache_path
 
 
