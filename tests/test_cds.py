@@ -238,14 +238,17 @@ def test_dataset_pool_positive_time_shift(data_singapore, kind):
 
 @pytest.mark.parametrize("region", [SGP, BRB])
 def test_pool_partial(region):
-    r = ReanalysisSingleLevels(region, VARIABLES, path=Path("tests/data"))
-    pool = r.get_dataset_pool()
-    assert pool.part_chunks == ["2025-05", "2025-06"]
-    ds = pool.get_current_year("2025-05-03", "2025-06-12")
-    assert ds.instant.valid_time.min().values == np.datetime64("2025-05-03")
-    assert ds.instant.valid_time.max().values == np.datetime64("2025-06-12T23")
-    assert ds.accum.valid_time.min().values == np.datetime64("2025-05-03")
-    assert ds.accum.valid_time.max().values == np.datetime64("2025-06-12T23")
+    fake_date = datetime.datetime(2025, 7, 3)
+    with patch("datetime.datetime") as mock_datetime:
+        mock_datetime.today.return_value = fake_date
+        r = ReanalysisSingleLevels(region, VARIABLES, path=Path("tests/data"))
+        pool = r.get_dataset_pool()
+        assert pool.part_chunks == ["2025-05", "2025-06"]
+        ds = pool.get_current_year("2025-05-03", "2025-06-12")
+        assert ds.instant.valid_time.min().values == np.datetime64("2025-05-03")
+        assert ds.instant.valid_time.max().values == np.datetime64("2025-06-12T23")
+        assert ds.accum.valid_time.min().values == np.datetime64("2025-05-03")
+        assert ds.accum.valid_time.max().values == np.datetime64("2025-06-12T23")
 
 
 @pytest.mark.parametrize("kind", ["instant", "accum"])

@@ -12,7 +12,6 @@ import operator
 import re
 import warnings
 import zipfile
-import datetime
 from pathlib import Path
 from typing import Iterable, Literal, NamedTuple, Sequence
 
@@ -663,13 +662,14 @@ class ReanalysisSingleLevels:
         return DatasetPool(
             self.path.glob(f"{self.name_without_admin}-????-*{self.stub}.*.nc"),
             shift_hours=hours,
+            stub=self.stub,
         )
 
 
 class DatasetPool:
     "Collection of ERA5 reanalysis data"
 
-    def __init__(self, paths: Iterable[Path], shift_hours: int = 0):
+    def __init__(self, paths: Iterable[Path], shift_hours: int = 0, stub: str = "era5"):
         """Instantiates a pool of yearly downloaded data that allows time-shifting
 
         Parameters
@@ -679,17 +679,24 @@ class DatasetPool:
             must be in the same folder.
         shift_hours : int
             Integral number of hours to time shift the data, ranges from -12 to 12
+        stub : str
+            Stub to use for matching filenames, default=`era5`
         """
         self.paths = list(paths)
 
-        regex = re.compile(r"^([A-Z]{3})-(\d{4})-(.*?)\.(instant|accum)\.nc$")
+        regex = re.compile(
+            r"^([A-Z]{3})-(\d{4})-(STUB)\.(instant|accum)\.nc$".replace("STUB", stub)
+        )
         part_regex = re.compile(
-            r"^([A-Z]{3})-(\d{4}-0\d|1[0-2])(_part)?-(.*?)\.(instant|accum)\.nc$"
+            r"^([A-Z]{3})-(\d{4}-0\d|1[0-2])(_part)?-(STUB)\.(instant|accum)\.nc$".replace(
+                "STUB", stub
+            )
         )
         # check that all files have the same stub
         matches = [regex.match(f.name) for f in self.paths]
         part_matches = [part_regex.match(f.name) for f in self.paths]
         match_groups = [m.groups() for m in matches if m]
+        print("MATCH GROUPS:", match_groups)
         part_match_groups = [m.groups() for m in part_matches if m]
         parents = set(p.parent for p in self.paths)
         if len(parents) != 1:
