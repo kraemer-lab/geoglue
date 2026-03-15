@@ -696,7 +696,7 @@ class DatasetPool:
         matches = [regex.match(f.name) for f in self.paths]
         part_matches = [part_regex.match(f.name) for f in self.paths]
         match_groups = [m.groups() for m in matches if m]
-        print("MATCH GROUPS:", match_groups)
+        logger.debug(f"DatasetPool match groups: {match_groups}")
         part_match_groups = [m.groups() for m in part_matches if m]
         parents = set(p.parent for p in self.paths)
         if len(parents) != 1:
