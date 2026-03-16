@@ -9,6 +9,6 @@ sudo apt-get update && sudo apt-get install -y \
   libgeos-dev \
   python3-dev \
   python3-pybind11 \
-  libeccodes0 \
+  libeccodes-dev \
   unzip \
   wget
