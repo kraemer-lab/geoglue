@@ -29,6 +29,10 @@ jobs:
         brew install cdo
     - name: Install build dependencies
       run: ./scripts/install_exactextract_build_deps.sh
+    - name: Install dependencies
+      run: uv sync --all-extras
+    - name: Try importing eccodes
+      run: uv run python -c 'import eccodes'
     - name: Lint and test
       run: |
         export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
