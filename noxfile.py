@@ -28,7 +28,7 @@ def apidocs(session):
     session.run("uv", "sync", "--all-extras", "--dev")
     session.run("uv", "run", "sphinx-apidoc", "-o", "docs/reference", "-H", "Module reference", "src/geoglue")
 
-@nox.session(python="3.10")
+@nox.session(python="3.11")
 def tests(session):
     session.env.update({"UV_PROJECT_ENVIRONMENT": session.virtualenv.location})
     session.run("uv", "sync", "--all-extras", "--dev")
