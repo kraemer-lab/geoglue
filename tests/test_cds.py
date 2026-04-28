@@ -243,7 +243,7 @@ def test_pool_partial(region):
         mock_datetime.today.return_value = fake_date
         r = ReanalysisSingleLevels(region, VARIABLES, path=Path("tests/data"))
         pool = r.get_dataset_pool()
-        assert pool.part_years == ["2025-05", "2025-06"]
+        assert pool.part_years == [("2025-05", None), ("2025-06", "_part")]
         ds = pool.get_current_year("2025-05-03", "2025-06-12")
         assert ds.instant.valid_time.min().values == np.datetime64("2025-05-03")
         assert ds.instant.valid_time.max().values == np.datetime64("2025-06-12T23")
