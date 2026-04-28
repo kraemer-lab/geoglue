@@ -713,7 +713,7 @@ class DatasetPool:
         # cur_year = int(datetime.datetime.today().year)
         # if cur_year in self.years:
         #     self.years.remove(cur_year)
-        self.part_chunks: list[tuple[str, str | None]] = sorted(
+        self.part_years: list[tuple[str, str | None]] = sorted(
             set(map(operator.itemgetter(1, 2), part_match_groups))
         )
         if len(stubs) > 1 or len(iso3) > 1:
@@ -725,7 +725,7 @@ class DatasetPool:
         self.stub = stubs.pop()
 
         # all files should be hourly data
-        for year_chunk in self.years + self.part_chunks:
+        for year_chunk in self.years + self.part_years:
             if type(year_chunk) is int:
                 d = self.path(year_chunk).as_dataset()
             else:
