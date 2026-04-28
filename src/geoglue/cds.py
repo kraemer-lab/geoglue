@@ -738,11 +738,14 @@ class DatasetPool:
     def __repr__(self) -> str:
         return f"DatasetPool(shift_hours={self.shift_hours}, paths={self.paths!r}"
 
-    def path(self, year: int) -> CdsPath:
+    def path(self, year: int, month: int | None = None, part: bool = False) -> CdsPath:
         "Returns CdsDataset corresponding to a particular year"
+        base_str = f"{self.iso3}-{year}{f'-{month:02d}' if month is not None else ''}{'_part' if part else ''}-{self.stub}"
+        instant_fstr = base_str + ".instant.nc"
+        accum_fstr = base_str + ".accum.nc"
         return CdsPath(
-            instant=self.folder / f"{self.iso3}-{year}-{self.stub}.instant.nc",
-            accum=self.folder / f"{self.iso3}-{year}-{self.stub}.accum.nc",
+            instant=self.folder / instant_fstr,
+            accum=self.folder / accum_fstr,
         )
 
     def get_current_year(
