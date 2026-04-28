@@ -725,8 +725,16 @@ class DatasetPool:
         self.stub = stubs.pop()
 
         # all files should be hourly data
-        for year in self.years:
-            d = self.path(year).as_dataset()
+        for year_chunk in self.years + self.part_chunks:
+            if type(year_chunk) is int:
+                d = self.path(year_chunk).as_dataset()
+            else:
+                ym_split = year_chunk[0].split("-")  # type: ignore
+                has_part = year_chunk[1] is not None  # type: ignore
+                year = int(ym_split[0])
+                month = int(ym_split[1])
+                d = self.path(year, month, has_part).as_dataset()
+
             # TODO: Figure out why directly using 'if not self.path(year).as_dataset().is_hourly:'
             #       raises a segfault
             if not d.is_hourly:
