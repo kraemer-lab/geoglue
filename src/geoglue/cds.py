@@ -713,7 +713,9 @@ class DatasetPool:
         # cur_year = int(datetime.datetime.today().year)
         # if cur_year in self.years:
         #     self.years.remove(cur_year)
-        self.part_chunks = sorted(set(map(operator.itemgetter(1), part_match_groups)))
+        self.part_chunks: list[tuple[str, str | None]] = sorted(
+            set(map(operator.itemgetter(1, 2), part_match_groups))
+        )
         if len(stubs) > 1 or len(iso3) > 1:
             raise ValueError(
                 f"Multiple {iso3=} or {stubs=} not allowed in DatasetPool, specify a stricter path glob"
