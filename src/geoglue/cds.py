@@ -757,6 +757,20 @@ class DatasetPool:
             accum=self.folder / accum_fstr,
         )
 
+    def path_min_part_year(self, year: int) -> CdsPath:
+        "Returns CdsPath of the earliest available month of a partially downloaded year"
+        part_year_idx = min(
+            (
+                idx
+                for idx, (ym, _) in enumerate(self.part_chunks)
+                if ym.startswith(f"{year}-")
+            ),
+            key=lambda i: self.part_chunks[i][0],
+        )
+        part_month = int(self.part_chunks[part_year_idx][0].split("-")[1])
+        part_month_partial = self.part_chunks[part_year_idx][1] is not None
+        return self.path(year, part_month, part_month_partial)
+
     def get_current_year(
         self, start_date: datetime.date | str, end_date: datetime.date | str
     ) -> CdsDataset:
@@ -853,16 +867,6 @@ class DatasetPool:
         is_part_year = year in self.part_years
         if year not in self.years:
             if is_part_year:
-                part_year_idx = min(
-                    (
-                        idx
-                        for idx, (ym, _) in enumerate(self.part_chunks)
-                        if ym.startswith(f"{year}-")
-                    ),
-                    key=lambda i: self.part_chunks[i][0],
-                )
-                part_month = int(self.part_chunks[part_year_idx][0].split("-")[1])
-                part_month_partial = self.part_chunks[part_year_idx][1] is not None
                 warnings.warn(
                     f"Selected year {year} is partial, please make sure it has at least 1 ISO week"
                 )
@@ -881,7 +885,7 @@ class DatasetPool:
                 f"Negative shift_hours={self.shift_hours} require succeeding year at {self.path(year + 1)}"
             )
         if is_part_year:
-            ds = self.path(year, part_month, part_month_partial).as_dataset()  # type: ignore
+            ds = self.path_min_part_year(year).as_dataset()
         else:
             ds = self.path(year).as_dataset()
         time_dim = ds.get_time_dim()
