@@ -716,6 +716,7 @@ class DatasetPool:
         self.part_chunks: list[tuple[str, str | None]] = sorted(
             set(map(operator.itemgetter(1, 2), part_match_groups))
         )
+        self.part_years = list(set([int(x[0].split("-")[0]) for x in self.part_chunks]))
         if len(stubs) > 1 or len(iso3) > 1:
             raise ValueError(
                 f"Multiple {iso3=} or {stubs=} not allowed in DatasetPool, specify a stricter path glob"
