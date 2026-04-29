@@ -850,10 +850,26 @@ class DatasetPool:
 
     def __getitem__(self, year: int) -> CdsDataset:
         "Returns hourly dataset for a particular year, time-shifted to local timezone"
+        is_part_year = year in self.part_years
         if year not in self.years:
-            raise IndexError(
-                f"{year=} not found in DatasetPool, valid years: {self.years}"
-            )
+            if is_part_year:
+                part_year_idx = min(
+                    (
+                        idx
+                        for idx, (ym, _) in enumerate(self.part_chunks)
+                        if ym.startswith(f"{year}-")
+                    ),
+                    key=lambda i: self.part_chunks[i][0],
+                )
+                part_month = int(self.part_chunks[part_year_idx][0].split("-")[1])
+                part_month_partial = self.part_chunks[part_year_idx][1] is not None
+                warnings.warn(
+                    f"Selected year {year} is partial, please make sure it has at least 1 ISO week"
+                )
+            else:
+                raise IndexError(
+                    f"{year=} not found in DatasetPool, valid years: {self.years}"
+                )
         if self.shift_hours == 0:
             return self.path(year).as_dataset()
         if self.shift_hours > 0 and not self.path(year - 1).exists():
@@ -864,7 +880,10 @@ class DatasetPool:
             raise FileNotFoundError(
                 f"Negative shift_hours={self.shift_hours} require succeeding year at {self.path(year + 1)}"
             )
-        ds = self.path(year).as_dataset()
+        if is_part_year:
+            ds = self.path(year, part_month, part_month_partial).as_dataset()  # type: ignore
+        else:
+            ds = self.path(year).as_dataset()
         time_dim = ds.get_time_dim()
         time_coord = ds.instant.coords[time_dim]
         if self.shift_hours > 0:
