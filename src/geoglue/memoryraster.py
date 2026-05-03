@@ -37,8 +37,7 @@ from rasterio.transform import from_origin
 from rasterio.io import MemoryFile
 from rasterio.warp import calculate_default_transform, reproject
 
-from .types import CdoGriddes, Bbox
-from .util import sha256
+from .types import Bbox, CdoGriddes
 
 DEFAULT_COLORMAP = "viridis"
 
