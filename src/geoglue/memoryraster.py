@@ -203,6 +203,8 @@ class MemoryRaster:
         )
 
     def checksum(self) -> str:
+        from .util import sha256
+
         h = (
             sha256(self.origin_path, prefix=True)
             if self.origin_path
