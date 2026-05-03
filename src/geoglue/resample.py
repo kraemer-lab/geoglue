@@ -1,16 +1,17 @@
 import os
 import tempfile
 import warnings
-from pathlib import Path
-from typing import Literal
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
+from typing import Literal
 
 import cdo
-import xarray as xr
 import numpy as np
-from .util import is_lonlat
+import xarray as xr
+
 from .types import Bbox, CdoGriddes
+from .util import get_resample_target_bbox, is_lonlat
 
 warnings.filterwarnings("ignore", category=FutureWarning, message=r".*MemoryRaster.*")
 
@@ -84,7 +85,7 @@ def remapbil_sparse(
 def resample(
     resampling: Literal["remapbil", "remapdis", "sremapbil"],
     infile: str | Path,
-    target: MemoryRaster | CdoGriddes,
+    target: MemoryRaster | CdoGriddes | xr.DataArray,
     outfile: str | Path | None = None,
     skip_exists=True,
 ) -> Path:
@@ -102,7 +103,7 @@ def resample(
     infile
         Input file to read
     target
-        Target MemoryRaster whose grid to resample to, or a CdoGriddes
+        Target MemoryRaster whose grid to resample to, or a CdoGriddes, or an xr.DataArray
     outfile
         Output resampled file path, if not specified, generated from infile by
         affixing `.resampled` to the path
@@ -119,7 +120,7 @@ def resample(
     if isinstance(infile, str):
         infile = Path(infile)
     raster_bbox = Bbox.from_xarray(xr.open_dataset(infile, decode_timedelta=True))
-    target_bbox = target.bbox if isinstance(target, MemoryRaster) else target.get_bbox()
+    target_bbox = get_resample_target_bbox(target)
     if not raster_bbox > target_bbox:
         warnings.warn(f"""
 Raster bbox should entirely cover target bbox to ensure no NA in CDO resample.

@@ -1,20 +1,21 @@
 "Utility functions for geoglue"
 
-import re
-import logging
-import hashlib
 import datetime
+import hashlib
+import logging
+import re
+import shutil
 from pathlib import Path
 from typing import TypeVar
-import shutil
 
-import xarray as xr
-import requests
-import pandas as pd
 import geopandas as gpd
 import numpy as np
+import pandas as pd
+import requests
+import xarray as xr
 
-from geoglue.types import Bbox
+from geoglue.memoryraster import MemoryRaster
+from geoglue.types import Bbox, CdoGriddes
 
 logger = logging.getLogger(__name__)
 
@@ -287,3 +288,20 @@ def download_file(
 # Plotting functions
 def geom_plot(df: pd.DataFrame, geometry: gpd.GeoDataFrame, col: str = "value"):
     return gpd.GeoDataFrame(df.merge(geometry)).plot(col)
+
+
+def get_resample_target_bbox(target: MemoryRaster | CdoGriddes | xr.DataArray) -> Bbox:
+    if isinstance(target, MemoryRaster):
+        return target.bbox
+    elif isinstance(target, CdoGriddes):
+        return target.get_bbox()
+    elif isinstance(target, xr.DataArray):
+        min_lon = round(float(target.longitude.min()), 2)
+        min_lat = round(float(target.latitude.min()), 2)
+        max_lon = round(float(target.longitude.max()), 2)
+        max_lat = round(float(target.latitude.max()), 2)
+        return Bbox(min_lon, min_lat, max_lon, max_lat)
+    else:
+        TypeError(
+            "`target` class must be one of [MemoryRaster, CdoGriddes, xr.DataArray]"
+        )
