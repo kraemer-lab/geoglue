@@ -863,7 +863,11 @@ class DatasetPool:
         return shifted_ds
 
     def __getitem__(self, year: int) -> CdsDataset:
-        "Returns hourly dataset for a particular year, time-shifted to local timezone"
+        """
+        Returns hourly dataset for a particular year, time-shifted to local timezone.
+        For partially downloaded year (typical case for the current year), only the first month will be returned.
+        If you want to get the exact month, please use `DatasetPool.path_min_part_year(year: int)`
+        """
         is_part_year = year in self.part_years
         if year not in self.years:
             if is_part_year:
