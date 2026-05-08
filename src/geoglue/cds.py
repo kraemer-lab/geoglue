@@ -727,7 +727,7 @@ class DatasetPool:
 
         # all files should be hourly data
         for year_chunk in self.years + self.part_chunks:
-            if type(year_chunk) is int:
+            if isinstance(year_chunk, int):
                 d = self.path(year_chunk).as_dataset()
             else:
                 ym_split = year_chunk[0].split("-")  # type: ignore
