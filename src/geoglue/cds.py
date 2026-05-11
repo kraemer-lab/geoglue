@@ -716,6 +716,7 @@ class DatasetPool:
         self.part_chunks: list[tuple[str, str | None]] = sorted(
             set(map(operator.itemgetter(1, 2), part_match_groups))
         )
+        self.part_years = list(set([int(x[0].split("-")[0]) for x in self.part_chunks]))
         if len(stubs) > 1 or len(iso3) > 1:
             raise ValueError(
                 f"Multiple {iso3=} or {stubs=} not allowed in DatasetPool, specify a stricter path glob"
@@ -725,8 +726,16 @@ class DatasetPool:
         self.stub = stubs.pop()
 
         # all files should be hourly data
-        for year in self.years:
-            d = self.path(year).as_dataset()
+        for year_chunk in self.years + self.part_chunks:
+            if isinstance(year_chunk, int):
+                d = self.path(year_chunk).as_dataset()
+            else:
+                ym_split = year_chunk[0].split("-")  # type: ignore
+                has_part = year_chunk[1] is not None  # type: ignore
+                year = int(ym_split[0])
+                month = int(ym_split[1])
+                d = self.path(year, month, has_part).as_dataset()
+
             # TODO: Figure out why directly using 'if not self.path(year).as_dataset().is_hourly:'
             #       raises a segfault
             if not d.is_hourly:
@@ -747,6 +756,20 @@ class DatasetPool:
             instant=self.folder / instant_fstr,
             accum=self.folder / accum_fstr,
         )
+
+    def path_min_part_year(self, year: int) -> CdsPath:
+        "Returns CdsPath of the earliest available month of a partially downloaded year"
+        part_year_idx = min(
+            (
+                idx
+                for idx, (ym, _) in enumerate(self.part_chunks)
+                if ym.startswith(f"{year}-")
+            ),
+            key=lambda i: self.part_chunks[i][0],
+        )
+        part_month = int(self.part_chunks[part_year_idx][0].split("-")[1])
+        part_month_partial = self.part_chunks[part_year_idx][1] is not None
+        return self.path(year, part_month, part_month_partial)
 
     def get_current_year(
         self, start_date: datetime.date | str, end_date: datetime.date | str
@@ -840,11 +863,21 @@ class DatasetPool:
         return shifted_ds
 
     def __getitem__(self, year: int) -> CdsDataset:
-        "Returns hourly dataset for a particular year, time-shifted to local timezone"
+        """
+        Returns hourly dataset for a particular year, time-shifted to local timezone.
+        For partially downloaded year (typical case for the current year), only the first month will be returned.
+        If you want to get the exact month, please use `DatasetPool.path_min_part_year(year: int)`
+        """
+        is_part_year = year in self.part_years
         if year not in self.years:
-            raise IndexError(
-                f"{year=} not found in DatasetPool, valid years: {self.years}"
-            )
+            if is_part_year:
+                warnings.warn(
+                    f"Selected year {year} is partial, please make sure it has at least 1 ISO week"
+                )
+            else:
+                raise IndexError(
+                    f"{year=} not found in DatasetPool, valid years: {self.years}"
+                )
         if self.shift_hours == 0:
             return self.path(year).as_dataset()
         if self.shift_hours > 0 and not self.path(year - 1).exists():
@@ -855,7 +888,10 @@ class DatasetPool:
             raise FileNotFoundError(
                 f"Negative shift_hours={self.shift_hours} require succeeding year at {self.path(year + 1)}"
             )
-        ds = self.path(year).as_dataset()
+        if is_part_year:
+            ds = self.path_min_part_year(year).as_dataset()
+        else:
+            ds = self.path(year).as_dataset()
         time_dim = ds.get_time_dim()
         time_coord = ds.instant.coords[time_dim]
         if self.shift_hours > 0:
@@ -937,7 +973,9 @@ class DatasetPool:
                     raise ValueError(
                         "Invalid aggregation metric for 'accum' variable: must be 'sum' or unspecified"
                     )
-        if not self.path(year - 1).exists() or not self.path(year + 1).exists():
+        if not self.path(year - 1).exists() or not (
+            self.path(year + 1).exists() or self.path_min_part_year(year + 1).exists()
+        ):
             raise FileNotFoundError(
                 f"Both data for {year - 1} and {year + 1} must be present for weekly statistics for {year=}"
             )
