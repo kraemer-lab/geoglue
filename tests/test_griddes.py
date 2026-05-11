@@ -3,7 +3,7 @@ from geoglue.types import CdoGriddes
 
 def test_population_griddes_repr(population_1km):
     assert (
-        str(population_1km.griddes)
+        str(population_1km)
         == """
 gridtype  = lonlat
 gridsize  = 1565499
@@ -24,7 +24,7 @@ xunits    = "degrees_east"
 
 
 def test_approx_equal_success(population_1km):
-    assert population_1km.griddes.approx_equal(
+    assert population_1km.approx_equal(
         CdoGriddes(
             gridtype="lonlat",
             gridsize=1565499,
@@ -45,7 +45,7 @@ def test_approx_equal_success(population_1km):
 
 
 def test_approx_equal_fail_float_diff(population_1km):
-    assert not population_1km.griddes.approx_equal(
+    assert not population_1km.approx_equal(
         CdoGriddes(
             gridtype="lonlat",
             gridsize=1565499,
@@ -66,7 +66,7 @@ def test_approx_equal_fail_float_diff(population_1km):
 
 
 def test_approx_equal_fail_integer_diff(population_1km):
-    assert not population_1km.griddes.approx_equal(
+    assert not population_1km.approx_equal(
         CdoGriddes(
             gridtype="lonlat",
             gridsize=1565498,
