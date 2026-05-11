@@ -179,8 +179,8 @@ def resampled_dataset(
     Example
     -------
     >>> from geoglue.resample import resampled_dataset
-    >>> from geoglue import MemoryRaster
-    >>> pop = MemoryRaster.read("VNM_ppp_2000_1km_Aggregated_UNadj.tif")
+    >>> from geoglue.util import read_geotiff
+    >>> pop = read_geotiff("VNM_ppp_2000_1km_Aggregated_UNadj.tif")
     >>> with resampled_dataset("remapbil", "somefile.nc", pop) as ds:
     ...     print(ds)
     """
