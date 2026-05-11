@@ -2,11 +2,12 @@ from pathlib import Path
 
 import pytest
 import xarray as xr
-from geoglue.types import CdoGriddes
-from geoglue.zonalstats import zonalstats
+
 from geoglue.region import geoboundaries
 from geoglue.resample import resample
+from geoglue.types import CdoGriddes
 from geoglue.util import read_geotiff, sort_lonlat
+from geoglue.zonalstats import zonalstats
 
 DATA_PATH = Path("data")
 PRECIP_DATA = DATA_PATH / "VNM" / "era5" / "VNM-2020-era5.daily_sum.nc"
@@ -47,7 +48,7 @@ def dataset_resampled(vnm_pop):
         outfile.unlink()
 
 
-def test_zonal_stats_raises_error(dataset, vnm_geoboundaries_admin2, vnm_pop):
+def test_zonalstats_raises_error(dataset, vnm_geoboundaries_admin2, vnm_pop):
     da = dataset.tp.sel(valid_time=slice("2020-01-01", "2020-01-01"))
     with pytest.raises(RuntimeError, match="Incompatible extent"):
         zonalstats(da, vnm_geoboundaries_admin2, "sum", weights=vnm_pop)
