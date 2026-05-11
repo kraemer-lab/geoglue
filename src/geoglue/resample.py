@@ -133,6 +133,13 @@ Target bounds: {target_bbox}
         )
     if isinstance(target, CdoGriddes) and target.gridtype != "lonlat":
         raise ValueError("resample only supports lonlat grid, target does not conform")
+    elif isinstance(target, (xr.DataArray, xr.Dataset)):
+        target = CdoGriddes.from_dataset(target)
+    else:
+        raise TypeError(
+            f"target type ({type(target)}) invalid, must be one of CdoGriddes, xarray.Dataset, xarray.DataArray"
+        )
+
     if outfile is None:
         outfile = infile.parent / f"{infile.stem}_{resampling}.nc"
     if Path(outfile).exists() and skip_exists:
