@@ -14,7 +14,7 @@ import pandas as pd
 import requests
 import xarray as xr
 
-from geoglue.types import Bbox, CdoGriddes
+from .types import Bbox, CdoGriddes
 
 logger = logging.getLogger(__name__)
 
@@ -289,7 +289,20 @@ def geom_plot(df: pd.DataFrame, geometry: gpd.GeoDataFrame, col: str = "value"):
     return gpd.GeoDataFrame(df.merge(geometry)).plot(col)
 
 
-def get_resample_target_bbox(target: CdoGriddes | xr.DataArray) -> Bbox:
+def get_resample_target_bbox(target: CdoGriddes | xr.Dataset | xr.DataArray) -> Bbox:
+    """Utility function to get resample target's bounding box
+
+    Parameters
+    ----------
+    target
+        Resample target object, must be one of CdoGriddes, xarray.Dataset, xarray.DataArray
+
+    Returns
+    -------
+    Bbox
+        Returns the target's bounding box
+
+    """
     if isinstance(target, CdoGriddes):
         return target.get_bbox()
     elif isinstance(target, xr.DataArray):
@@ -299,4 +312,6 @@ def get_resample_target_bbox(target: CdoGriddes | xr.DataArray) -> Bbox:
         max_lat = round(float(target.latitude.max()), 2)
         return Bbox(min_lon, min_lat, max_lon, max_lat)
     else:
-        TypeError("`target` class must be one of [CdoGriddes, xr.DataArray]")
+        raise TypeError(
+            f"target type ({type(target)}) invalid, must be one of CdoGriddes, xarray.Dataset, xarray.DataArray"
+        )
