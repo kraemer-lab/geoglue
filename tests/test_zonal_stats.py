@@ -59,6 +59,7 @@ def test_zonal_stats_raises_error(dataset, vnm_geoboundaries_admin2, vnm_pop):
         zonal_stats(da, vnm_geoboundaries_admin2, "sum", weights=vnm_pop)
 
 
+@pytest.mark.skip(reason="`geoglue.zonal_stats` is deprecated")
 @pytest.mark.parametrize(
     "op,int_value_max",
     [
@@ -78,6 +79,7 @@ def test_zonal_stats(
         assert "weighted_sum" in df.columns and "count" in df.columns
 
 
+@pytest.mark.skip(reason="`geoglue.zonal_stats` is deprecated")
 @pytest.mark.parametrize(
     "op,int_value_max",
     [
