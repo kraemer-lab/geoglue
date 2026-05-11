@@ -14,7 +14,6 @@ import pandas as pd
 import requests
 import xarray as xr
 
-from geoglue.memoryraster import MemoryRaster
 from geoglue.types import Bbox, CdoGriddes
 
 logger = logging.getLogger(__name__)
@@ -290,10 +289,8 @@ def geom_plot(df: pd.DataFrame, geometry: gpd.GeoDataFrame, col: str = "value"):
     return gpd.GeoDataFrame(df.merge(geometry)).plot(col)
 
 
-def get_resample_target_bbox(target: MemoryRaster | CdoGriddes | xr.DataArray) -> Bbox:
-    if isinstance(target, MemoryRaster):
-        return target.bbox
-    elif isinstance(target, CdoGriddes):
+def get_resample_target_bbox(target: CdoGriddes | xr.DataArray) -> Bbox:
+    if isinstance(target, CdoGriddes):
         return target.get_bbox()
     elif isinstance(target, xr.DataArray):
         min_lon = round(float(target.longitude.min()), 2)
@@ -302,6 +299,4 @@ def get_resample_target_bbox(target: MemoryRaster | CdoGriddes | xr.DataArray) -
         max_lat = round(float(target.latitude.max()), 2)
         return Bbox(min_lon, min_lat, max_lon, max_lat)
     else:
-        TypeError(
-            "`target` class must be one of [MemoryRaster, CdoGriddes, xr.DataArray]"
-        )
+        TypeError("`target` class must be one of [CdoGriddes, xr.DataArray]")

@@ -13,10 +13,6 @@ import xarray as xr
 from .types import Bbox, CdoGriddes
 from .util import get_resample_target_bbox, is_lonlat
 
-warnings.filterwarnings("ignore", category=FutureWarning, message=r".*MemoryRaster.*")
-
-from .memoryraster import MemoryRaster  # noqa
-
 WARN_BELOW_COVERAGE = 0.8
 
 
@@ -85,7 +81,7 @@ def remapbil_sparse(
 def resample(
     resampling: Literal["remapbil", "remapdis", "sremapbil"],
     infile: str | Path,
-    target: MemoryRaster | CdoGriddes | xr.DataArray,
+    target: CdoGriddes | xr.DataArray,
     outfile: str | Path | None = None,
     skip_exists=True,
 ) -> Path:
@@ -103,7 +99,7 @@ def resample(
     infile
         Input file to read
     target
-        Target MemoryRaster whose grid to resample to, or a CdoGriddes, or an xr.DataArray
+        Target `CdoGriddes` or `xr.DataArray` whose grid to resample to
     outfile
         Output resampled file path, if not specified, generated from infile by
         affixing `.resampled` to the path
@@ -135,19 +131,14 @@ Target bounds: {target_bbox}
         raise ValueError(
             "resample only supports lonlat grid, input file does not conform"
         )
-    if (isinstance(target, MemoryRaster) and not target.is_lonlat) or (
-        isinstance(target, CdoGriddes) and target.gridtype != "lonlat"
-    ):
+    if isinstance(target, CdoGriddes) and target.gridtype != "lonlat":
         raise ValueError("resample only supports lonlat grid, target does not conform")
     if outfile is None:
         outfile = infile.parent / f"{infile.stem}_{resampling}.nc"
     if Path(outfile).exists() and skip_exists:
         return Path(outfile)
     with tempfile.NamedTemporaryFile(suffix=".txt") as griddes:
-        if isinstance(target, MemoryRaster):
-            Path(griddes.name).write_text(str(target.griddes))
-        else:
-            Path(griddes.name).write_text(str(target))
+        Path(griddes.name).write_text(str(target))
 
         match resampling:
             case "remapbil":
@@ -167,7 +158,7 @@ Target bounds: {target_bbox}
 def resampled_dataset(
     resampling: Literal["remapbil", "remapdis"],
     data: str | Path | xr.Dataset,
-    target: MemoryRaster | xr.DataArray,
+    target: xr.DataArray,
 ) -> Iterator[xr.Dataset]:
     """Context manager version of :meth:`geoglue.resample.resample`.
 
@@ -178,7 +169,7 @@ def resampled_dataset(
     data
         Input file to read or xarray dataset
     target
-        Target MemoryRaster or xr.DataArray whose grid to resample to
+        Target `xr.DataArray` whose grid to resample to
 
     Yields
     ------
@@ -202,9 +193,6 @@ def resampled_dataset(
         infile_istempfile = Path(data), False
 
     with tempfile.NamedTemporaryFile(prefix="geoglue-", suffix=".nc") as f:
-        if isinstance(target, xr.DataArray):
-            # if xr.DataArray then convert to CdoGriddes before passing to resample()
-            target = CdoGriddes.from_dataset(target)
         resample(resampling, infile_istempfile[0], target, f.name, skip_exists=False)
         ds = xr.open_dataset(f.name, engine="netcdf4")
         yield ds
