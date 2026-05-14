@@ -18,6 +18,8 @@ admin_files = {2 = "/here/example/invalid-tz.shp"}
 pk = "shapeID"
 tz = "+07:00"
 url = "https://example.com"
+bbox = [102, 7, 190, 24]
+
 
 [HCM]
 bbox = [106.0, 8.5, 107.6, 11.6]
