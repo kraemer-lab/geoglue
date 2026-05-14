@@ -5,8 +5,8 @@ utilities to time-shift the data to a particular timezone
 
 from __future__ import annotations
 
-import json
 import datetime
+import json
 import logging
 import operator
 import re
@@ -20,9 +20,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-from .region import ZonedBaseRegion
+from .paths import geoglue_cache_path, geoglue_data_path
+from .region import VALID_ISO3, ZonedBaseRegion
 from .util import find_unique_time_coord, get_first_monday
-from .paths import geoglue_data_path, geoglue_cache_path
 
 logger = logging.getLogger(__name__)
 
@@ -462,7 +462,10 @@ class ReanalysisSingleLevels:
         # Keep part before admin for name
         # This assumes that the boundaries for a particular name prefix
         # are same across administrative levels
-        self.name_without_admin = self.name.split("-")[0]
+        if name in VALID_ISO3:
+            self.name_without_admin = self.name.split("-")[0]
+        else:
+            self.name_without_admin = self.region.iso3.split("-")[0]  # type: ignore
         if not (
             path := path or geoglue_data_path / self.name_without_admin / "era5"
         ).exists():
