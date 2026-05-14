@@ -468,8 +468,11 @@ class ReanalysisSingleLevels:
         elif region_iso3 in VALID_ISO3 and region_iso3 is not None:
             self.name_without_admin = region_iso3.split("-")[0]
         else:
+            # Not very likely to hit this `else` case, because `region` should
+            # already check if `region.iso3` is valid, but better safe than
+            # sorry
             raise ValueError(
-                f"Both {name} and {region_iso3} are not valid ISO3 values to use"
+                f"Both {name=} and {region.iso3=} are not valid ISO3 values to use"
             )
         if not (
             path := path or geoglue_data_path / self.name_without_admin / "era5"
