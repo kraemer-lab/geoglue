@@ -459,13 +459,18 @@ class ReanalysisSingleLevels:
         name = region.name.split(":")  # remove provider
         self.name = name[1] if len(name) > 1 else name[0]
 
+        region_iso3 = region.iso3
         # Keep part before admin for name
         # This assumes that the boundaries for a particular name prefix
         # are same across administrative levels
         if name in VALID_ISO3:
             self.name_without_admin = self.name.split("-")[0]
+        elif region_iso3 in VALID_ISO3 and region_iso3 is not None:
+            self.name_without_admin = region_iso3.split("-")[0]
         else:
-            self.name_without_admin = self.region.iso3.split("-")[0]  # type: ignore
+            raise ValueError(
+                f"Both {name} and {region_iso3} are not valid ISO3 values to use"
+            )
         if not (
             path := path or geoglue_data_path / self.name_without_admin / "era5"
         ).exists():
