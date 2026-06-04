@@ -1,7 +1,7 @@
 import datetime
 import re
 import tempfile
-from pathlib import Path
+from pathlib import Path, PosixPath
 from unittest.mock import patch
 
 import numpy as np
@@ -16,7 +16,7 @@ from geoglue.cds import (
     grib_to_netcdf,
     timeshift_hours_cdsdataset,
 )
-from geoglue.region import Country, CountryAdministrativeLevel
+from geoglue.region import Country, CountryAdministrativeLevel, Region
 from geoglue.types import Bbox
 
 BRB = Country(
@@ -50,6 +50,42 @@ NPL = CountryAdministrativeLevel(
     admin=1,
     admin_file="/path/to/NPL.shp",
     pk="GID_1",
+)
+
+VNM = Country(
+    "VNM",
+    "https://www.geoboundaries.org/api/current/gbOpen/VNM/",
+    Bbox(
+        maxy=23.39097449667571,
+        minx=102.14588283092797,
+        miny=8.43995762984082,
+        maxx=114.99696468067555,
+    ),
+    "VNM",
+    "+07:00",
+    {
+        1: PosixPath("data/VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp"),
+        2: PosixPath("data/VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp"),
+    },
+    "shapeID",
+)
+
+HCM = Region(
+    name="HCM",
+    url="https://gis.vn/",
+    bbox=Bbox(
+        maxx=107.6,
+        maxy=11.6,
+        minx=106.0,
+        miny=8.5,
+    ),
+    iso3="VNM",
+    tz="+07:00",
+    admin_files={
+        1: PosixPath("data/HCM/geoboundaries/HCM-1.shp"),
+        2: PosixPath("data/HCM/geoboundaries/HCM-2.shp"),
+    },
+    pk={1: "ma_tinh", 2: "ma_xa"},
 )
 
 
@@ -105,6 +141,23 @@ EXPECTED_REQUEST_GRIB = {
 )
 def test_get_timezone_offset_hours(offset, hours):
     assert get_timezone_offset_hours(offset) == hours
+
+
+def test_subregion_same_admin_name():
+    subregion = ReanalysisSingleLevels(
+        HCM,
+        VARIABLES,
+        path=Path("tests/data"),
+        data_format="netcdf",
+    )
+    parent_region = ReanalysisSingleLevels(
+        VNM,
+        VARIABLES,
+        path=Path("tests/data"),
+        data_format="netcdf",
+    )
+
+    assert subregion.name_without_admin == parent_region.name_without_admin
 
 
 @pytest.fixture(scope="module")

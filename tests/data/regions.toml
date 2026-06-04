@@ -18,4 +18,13 @@ admin_files = {2 = "/here/example/invalid-tz.shp"}
 pk = "shapeID"
 tz = "+07:00"
 url = "https://example.com"
-bbox = [102,7,190,24]
+bbox = [102, 7, 190, 24]
+
+
+[HCM]
+bbox = [106.0, 8.5, 107.6, 11.6]
+url = "https://gis.vn/"
+iso3 = "VNM"
+tz = "+07:00"
+admin_files = { 1 = "data/HCM/geoboundaries/HCM-1.shp", 2 = "data/HCM/geoboundaries/HCM-2.shp" }
+pk = { 1 = "ma_tinh", 2 = "ma_xa" }
