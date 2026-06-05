@@ -88,7 +88,8 @@ class ZonedBaseRegion(BaseRegion):
 class Region(ZonedBaseRegion):
     "Represents a geospatial region with a fixed time zone"
 
-    admin_files: Mapping[int, str | Path]
+    # This must be a tuple for Region to be hashable (for caching in dart-pipeline)
+    admin_files: tuple[tuple[int, str | Path], ...]
     "Path to shapefiles, indexed by administrative level"
 
     # This must be a tuple for Region to be hashable (for caching in dart-pipeline)
@@ -110,19 +111,21 @@ class Region(ZonedBaseRegion):
         )
 
     def read_admin(self, admin: int) -> gpd.GeoDataFrame:
+        admin_files_map = dict(self.admin_files)
         "Reads a region shapefile"
-        if admin not in self.admin_files:
+        if admin not in admin_files_map:
             raise KeyError(
                 f"Administrative level {admin} shapefile not defined for {self.name!r}"
             )
-        df = gpd.read_file(self.admin_files[admin])
+        df = gpd.read_file(admin_files_map[admin])
         # drop shapeISO column which is just None
         if "shapeISO" in df.columns:
             return df.drop(columns=["shapeISO"])  # type: ignore
         return df
 
     def admin(self, adm: int) -> AdministrativeLevel:
-        if adm not in self.admin_files:
+        admin_files_map = dict(self.admin_files)
+        if adm not in admin_files_map:
             raise KeyError(
                 f"Administrative level {adm} shapefile not defined for {self.name!r}"
             )
@@ -133,7 +136,7 @@ class Region(ZonedBaseRegion):
             self.iso3,
             self.tz,
             adm,
-            self.admin_files[adm],
+            admin_files_map[adm],
             dict(self.pk)[adm] if isinstance(self.pk, tuple) else self.pk
         )
 
