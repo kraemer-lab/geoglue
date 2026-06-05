@@ -419,4 +419,6 @@ def get_region(
     # this is important for caching functionality in dart-pipeline downstream
     if isinstance(pk, dict):
         pk = tuple(pk.items()) 
+    if isinstance(admin_files, dict):
+        admin_files = tuple(admin_files.items()) 
     return Region(name, url, bbox, iso3, tz, admin_files, pk)
