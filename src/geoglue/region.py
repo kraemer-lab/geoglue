@@ -223,7 +223,6 @@ def get_bbox(path: str | Path) -> Bbox:
     data = gpd.read_file(path)
     return Bbox(*data.total_bounds)
 
-
 def gadm(
     iso3: str,
     localize_date: datetime.datetime = LOCALIZE_DATE,
@@ -272,7 +271,7 @@ def gadm(
             )
         logger.info("GADM data downloaded to %s", path_geodata)
     admins = {
-        int(path.stem.split("_")[-1]): path for path in path_geodata.glob("*.shp")
+        int(path.stem.split("_")[-1]): path for path in sorted(path_geodata.glob("*.shp"))
     }
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
@@ -282,8 +281,9 @@ def gadm(
         get_bbox(admins[1]),
         iso3,
         tzoffset,
-        admins,
-        {i: f"GID_{i}" for i in admins},
+        # return tuple instead of dict
+        tuple(admins.items()),
+        tuple((i, f"GID_{i}") for i, _ in admins.items()),
     )
 
 
@@ -337,7 +337,7 @@ def geoboundaries(
     admins = {i: path_geodata / f"geoBoundaries-{iso3}-ADM{i}.shp" for i in [1, 2]}
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
-    return Country(iso3, url, get_bbox(admins[1]), iso3, tzoffset, admins, "shapeID")
+    return Country(iso3, url, get_bbox(admins[1]), iso3, tzoffset, tuple(admins.items()), "shapeID")
 
 
 def get_region(
@@ -418,7 +418,7 @@ def get_region(
     # make it tuple such that it is hashable
     # this is important for caching functionality in dart-pipeline downstream
     if isinstance(pk, dict):
-        pk = tuple(pk.items()) 
+        pk = tuple(sorted(pk.items()))
     if isinstance(admin_files, dict):
-        admin_files = tuple(admin_files.items()) 
+        admin_files = tuple(sorted(admin_files.items()))
     return Region(name, url, bbox, iso3, tz, admin_files, pk)
