@@ -24,9 +24,8 @@ geoglue has several modules:
 - {mod}`geoglue.cds`: Methods to work with data downloaded from ECMWF's [cdsapi](https://cds.climate.copernicus.eu/how-to-api)
 - {mod}`geoglue.region`: Fetch geospatial boundaries data from
   [GADM](https://gadm.org) or [geoBoundaries](https://www.geoboundaries.org)
-- {mod}`geoglue.memoryraster`: Read and work with GeoTIFF datasets in memory.
 - {mod}`geoglue.resample`: Resample data using the
   [Climate Data Operators](https://code.mpimet.mpg.de/projects/cdo) library.
-- {mod}`geoglue.zonal_stats`: Perform zonal statistics on climate data, such
+- {mod}`geoglue.zonalstats`: Perform zonal statistics on climate data, such
   as those downloaded from cdsapi via the `geoglue.cds` module
 
