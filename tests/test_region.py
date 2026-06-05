@@ -13,6 +13,7 @@ from geoglue.region import (
     get_timezone,
     Country,
     get_region,
+    Region
 )
 from geoglue.types import Bbox
 
@@ -37,6 +38,24 @@ EXAMPLE_REGION = Country(
         2: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp",
     },
     "shapeID",
+)
+
+EXAMPLE_CUSTOM_REGION = Region(
+    "HCM",
+    "https://gis.vn/",
+    Bbox(
+        minx= 106.0,
+        miny= 8.5,
+        maxx= 107.6,
+        maxy= 11.6
+    ),
+    "VNM",
+    "+07:00",
+    {
+        1: Path("data/HCM/geoboundaries/HCM-1.shp") ,
+        2: Path("data/HCM/geoboundaries/HCM-2.shp"),
+    },
+    ((1, "ma_tinh"),(2, "ma_xa")),
 )
 
 
@@ -157,6 +176,13 @@ def test_get_admin():
 def test_valid_get_region(region_name, region):
     assert get_region(region_name, REGION_FILE, fallback="geoboundaries") == region
 
+
+@pytest.mark.parametrize(
+    "region_name,region",
+    [("HCM", EXAMPLE_CUSTOM_REGION), ("HCM-2", EXAMPLE_CUSTOM_REGION)],
+)
+def test_custom_region(region_name, region):
+    assert get_region(region_name, REGION_FILE, fallback="geoboundaries") == region
 
 @pytest.mark.parametrize("region", ["invalid_tz", "invalid_bounds"])
 def test_invalid_get_region(region):
