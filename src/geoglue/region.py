@@ -22,6 +22,8 @@ import geopandas as gpd
 
 import tomli as toml
 
+# import warnings
+
 from .util import download_file
 from .types import Bbox
 from .paths import geoglue_data_path
@@ -89,7 +91,8 @@ class Region(ZonedBaseRegion):
     admin_files: Mapping[int, str | Path]
     "Path to shapefiles, indexed by administrative level"
 
-    pk: dict[int, str] | str
+    # This must be a tuple for Region to be hashable (for caching in dart-pipeline)
+    pk: tuple[tuple[int, str], ...] | str | str
     """Column ID that is used as primary key to identify regions
     in shapefile, indexed by administrative level.
 
@@ -131,7 +134,7 @@ class Region(ZonedBaseRegion):
             self.tz,
             adm,
             self.admin_files[adm],
-            self.pk[adm] if isinstance(self.pk, dict) else self.pk,
+            dict(self.pk)[adm] if isinstance(self.pk, tuple) else self.pk
         )
 
 
@@ -387,9 +390,15 @@ def get_region(
     if isinstance(iso3, str):
         iso3 = iso3.upper()
         if iso3 not in VALID_ISO3:
+            # TODO: Either
+            # - allow city lvl code (LOCODE maybe)
+            # - or allow custom code altogether (i.e., make this a warning instead)
             raise ValueError(
                 f"Invalid ISO3 code {iso3!r} found while processing region {region_dict}"
             )
+            # raise UserWarning(
+            #     f"Invalid ISO3 code {iso3!r} found while processing region {region_dict}"
+            # )
     if not re.match(r"[+-][01]\d:([03]0|45)", tz):
         raise ValueError(f"Invalid timezone in region {name}: {tz}")
     if not (url := region_dict["url"]).startswith("https://"):
@@ -402,4 +411,9 @@ def get_region(
     bbox = Bbox(minx, miny, maxx, maxy)
     if admin is not None and admin not in admin_files:
         raise ValueError(f"No shapefile specified for {admin=}, which is required")
+    
+    # make it tuple such that it is hashable
+    # this is important for caching functionality in dart-pipeline downstream
+    if isinstance(pk, dict):
+        pk = tuple(pk.items()) 
     return Region(name, url, bbox, iso3, tz, admin_files, pk)
