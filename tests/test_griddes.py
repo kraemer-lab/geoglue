@@ -3,18 +3,18 @@ from geoglue.types import CdoGriddes
 
 def test_population_griddes_repr(population_1km):
     assert (
-        str(population_1km.griddes)
+        str(population_1km)
         == """
 gridtype  = lonlat
-gridsize  = 1565499
-xsize     = 879
-ysize     = 1781
+gridsize  = 1560183
+xsize     = 877
+ysize     = 1779
 xname     = longitude
 yname     = latitude
-xfirst    = 102.14874960275003
+xfirst    = 102.1529162694
 xinc      = 0.0083333333
-yfirst    = 8.557916831327146
-yinc      = 0.0083333333
+yfirst    = 23.3870834386771
+yinc      = -0.0083333333
 ylongname = "latitude"
 yunits    = "degrees_north"
 xlongname = "longitude"
@@ -24,20 +24,20 @@ xunits    = "degrees_east"
 
 
 def test_approx_equal_success(population_1km):
-    assert population_1km.griddes.approx_equal(
+    assert population_1km.approx_equal(
         CdoGriddes(
             gridtype="lonlat",
-            gridsize=1565499,
-            xsize=879,
-            ysize=1781,
+            gridsize=1560183,
+            xsize=877,
+            ysize=1779,
             xname="longitude",
             yname="latitude",
             ylongname="latitude",
             yunits="degrees_north",
-            xfirst=102.14874960275003,
+            xfirst=102.1529162694,
             xinc=0.0083333333,
-            yfirst=8.557916831327146,
-            yinc=0.0083333333,
+            yfirst=23.3870834386771,
+            yinc=-0.0083333333,
             xlongname="longitude",
             xunits="degrees_east",
         )
@@ -45,7 +45,7 @@ def test_approx_equal_success(population_1km):
 
 
 def test_approx_equal_fail_float_diff(population_1km):
-    assert not population_1km.griddes.approx_equal(
+    assert not population_1km.approx_equal(
         CdoGriddes(
             gridtype="lonlat",
             gridsize=1565499,
@@ -66,7 +66,7 @@ def test_approx_equal_fail_float_diff(population_1km):
 
 
 def test_approx_equal_fail_integer_diff(population_1km):
-    assert not population_1km.griddes.approx_equal(
+    assert not population_1km.approx_equal(
         CdoGriddes(
             gridtype="lonlat",
             gridsize=1565498,

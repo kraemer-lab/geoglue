@@ -1,21 +1,20 @@
-"""Zonal stats compute
-
-This is going to replace geoglue.zonal_stats
+"""
+Zonal stats compute
 """
 
-import re
 import logging
+import re
 from pathlib import Path
 
 import exactextract
+import geopandas as gpd
 import numpy as np
 import pandas as pd
-import geopandas as gpd
 import xarray as xr
 
-from .types import CdoGriddes
-from .resample import resample
 from .config import ZonalStatsConfig
+from .resample import resample
+from .types import CdoGriddes
 from .util import read_geotiff
 
 logger = logging.getLogger(__name__)

@@ -1,13 +1,12 @@
-import xarray as xr
-import numpy as np
 from pathlib import Path
 
-from geoglue.resample import resample, resampled_dataset
-from geoglue.memoryraster import MemoryRaster
-from geoglue.util import fix_lonlat, read_geotiff
-from geoglue.types import CdoGriddes
-
+import numpy as np
 import pytest
+import xarray as xr
+
+from geoglue.resample import resample, resampled_dataset
+from geoglue.types import CdoGriddes
+from geoglue.util import fix_lonlat, read_geotiff
 
 INFILE = "data/VNM/era5/VNM-2020-era5.daily_sum.nc"
 
@@ -19,16 +18,16 @@ def na_frac(da: xr.DataArray) -> float:
 @pytest.mark.parametrize("resampling", ["remapbil", "remapdis"])
 def test_resample(resampling, population_1km):
     outfile = resample(resampling, INFILE, target=population_1km, skip_exists=False)
-    outrast = MemoryRaster.from_xarray(xr.open_dataset(outfile).tp.isel(valid_time=0))
-    assert outrast.griddes.approx_equal(population_1km.griddes)
+    outrast = CdoGriddes.from_dataset(xr.open_dataset(outfile).tp.isel(valid_time=0))
+    assert outrast.approx_equal(population_1km)
     outfile.unlink()
 
 
 @pytest.mark.parametrize("resampling", ["remapbil", "remapdis"])
 def test_resampled_dataset(resampling, population_1km):
     with resampled_dataset(resampling, INFILE, target=population_1km) as ds:
-        outrast = MemoryRaster.from_xarray(ds.tp.isel(valid_time=0))
-        assert outrast.griddes.approx_equal(population_1km.griddes)
+        outrast = CdoGriddes.from_dataset(ds.tp.isel(valid_time=0))
+        assert outrast.approx_equal(population_1km)
 
 
 def test_resample_sparse_vs_resample():

@@ -1,21 +1,23 @@
 import datetime
 from pathlib import Path
-
-import pytest
-import numpy as np
 from unittest.mock import patch
 
-from geoglue.memoryraster import MemoryRaster
+import numpy as np
+import pytest
+
 from geoglue.region import (
+    Country,
     CountryAdministrativeLevel,
     gadm,
     geoboundaries,
+    get_region,
     get_timezone,
     Country,
     get_region,
     Region
 )
 from geoglue.types import Bbox
+from geoglue.util import read_geotiff
 
 DATA_PATH = Path.home() / ".local/share/geoglue"
 REGION_FILE = Path("tests/data/regions.toml")
@@ -141,9 +143,7 @@ def test_timezone_warnings():
 
 @pytest.mark.parametrize("year,population", [(2000, 79910432), (2020, 97338600)])
 def test_worldpop_1km(year, population):
-    rast = MemoryRaster.read(
-        f"data/VNM/worldpop/vnm_ppp_{year}_1km_Aggregated_UNadj.tif"
-    )
+    rast = read_geotiff(f"data/VNM/worldpop/vnm_ppp_{year}_1km_Aggregated_UNadj.tif")
     assert int(rast.sum()) == population
 
 
