@@ -8,23 +8,23 @@ calculating extents or geospatial bounds, and calculating timezone offsets.
 from __future__ import annotations
 
 import dataclasses
-import re
-import logging
 import datetime
-from typing import Mapping, Literal
+import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
-import pytz
-import pycountry
-import requests
 import geopandas as gpd
-
+import pycountry
+import pytz
+import requests
 import tomli as toml
 
-from .util import download_file
-from .types import Bbox
+# import warnings
 from .paths import geoglue_data_path
+from .types import Bbox
+from .util import download_file
 
 logger = logging.getLogger(__name__)
 
@@ -86,10 +86,12 @@ class ZonedBaseRegion(BaseRegion):
 class Region(ZonedBaseRegion):
     "Represents a geospatial region with a fixed time zone"
 
-    admin_files: Mapping[int, str | Path]
+    # This must be a tuple for Region to be hashable (for caching in dart-pipeline)
+    admin_files: tuple[tuple[int, str | Path], ...]
     "Path to shapefiles, indexed by administrative level"
 
-    pk: dict[int, str] | str
+    # This must be a tuple for Region to be hashable (for caching in dart-pipeline)
+    pk: tuple[tuple[int, str], ...] | str
     """Column ID that is used as primary key to identify regions
     in shapefile, indexed by administrative level.
 
@@ -107,19 +109,21 @@ class Region(ZonedBaseRegion):
         )
 
     def read_admin(self, admin: int) -> gpd.GeoDataFrame:
+        admin_files_map = dict(self.admin_files)
         "Reads a region shapefile"
-        if admin not in self.admin_files:
+        if admin not in admin_files_map:
             raise KeyError(
                 f"Administrative level {admin} shapefile not defined for {self.name!r}"
             )
-        df = gpd.read_file(self.admin_files[admin])
+        df = gpd.read_file(admin_files_map[admin])
         # drop shapeISO column which is just None
         if "shapeISO" in df.columns:
             return df.drop(columns=["shapeISO"])  # type: ignore
         return df
 
     def admin(self, adm: int) -> AdministrativeLevel:
-        if adm not in self.admin_files:
+        admin_files_map = dict(self.admin_files)
+        if adm not in admin_files_map:
             raise KeyError(
                 f"Administrative level {adm} shapefile not defined for {self.name!r}"
             )
@@ -130,8 +134,8 @@ class Region(ZonedBaseRegion):
             self.iso3,
             self.tz,
             adm,
-            self.admin_files[adm],
-            self.pk[adm] if isinstance(self.pk, dict) else self.pk,
+            admin_files_map[adm],
+            dict(self.pk)[adm] if isinstance(self.pk, tuple) else self.pk,
         )
 
 
@@ -266,7 +270,8 @@ def gadm(
             )
         logger.info("GADM data downloaded to %s", path_geodata)
     admins = {
-        int(path.stem.split("_")[-1]): path for path in path_geodata.glob("*.shp")
+        int(path.stem.split("_")[-1]): path
+        for path in sorted(path_geodata.glob("*.shp"))
     }
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
@@ -276,8 +281,9 @@ def gadm(
         get_bbox(admins[1]),
         iso3,
         tzoffset,
-        admins,
-        {i: f"GID_{i}" for i in admins},
+        # return tuple instead of dict
+        tuple(admins.items()),
+        tuple((i, f"GID_{i}") for i, _ in admins.items()),
     )
 
 
@@ -331,7 +337,9 @@ def geoboundaries(
     admins = {i: path_geodata / f"geoBoundaries-{iso3}-ADM{i}.shp" for i in [1, 2]}
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
-    return Country(iso3, url, get_bbox(admins[1]), iso3, tzoffset, admins, "shapeID")
+    return Country(
+        iso3, url, get_bbox(admins[1]), iso3, tzoffset, tuple(admins.items()), "shapeID"
+    )
 
 
 def get_region(
@@ -387,9 +395,15 @@ def get_region(
     if isinstance(iso3, str):
         iso3 = iso3.upper()
         if iso3 not in VALID_ISO3:
+            # TODO: Either
+            # - allow city lvl code (LOCODE maybe)
+            # - or allow custom code altogether (i.e., make this a warning instead)
             raise ValueError(
                 f"Invalid ISO3 code {iso3!r} found while processing region {region_dict}"
             )
+            # raise UserWarning(
+            #     f"Invalid ISO3 code {iso3!r} found while processing region {region_dict}"
+            # )
     if not re.match(r"[+-][01]\d:([03]0|45)", tz):
         raise ValueError(f"Invalid timezone in region {name}: {tz}")
     if not (url := region_dict["url"]).startswith("https://"):
@@ -402,4 +416,11 @@ def get_region(
     bbox = Bbox(minx, miny, maxx, maxy)
     if admin is not None and admin not in admin_files:
         raise ValueError(f"No shapefile specified for {admin=}, which is required")
+
+    # make it tuple such that it is hashable
+    # this is important for caching functionality in dart-pipeline downstream
+    if isinstance(pk, dict):
+        pk = tuple(sorted(pk.items()))
+    if isinstance(admin_files, dict):
+        admin_files = tuple(sorted(admin_files.items()))
     return Region(name, url, bbox, iso3, tz, admin_files, pk)

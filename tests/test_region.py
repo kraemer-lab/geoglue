@@ -8,6 +8,7 @@ import pytest
 from geoglue.region import (
     Country,
     CountryAdministrativeLevel,
+    Region,
     gadm,
     geoboundaries,
     get_region,
@@ -32,11 +33,24 @@ EXAMPLE_REGION = Country(
     BBOX,
     "VNM",
     "+07:00",
-    {
-        1: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp",
-        2: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp",
-    },
+    (
+        (1, Path(DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp")),
+        (2, Path(DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp")),
+    ),
     "shapeID",
+)
+
+EXAMPLE_CUSTOM_REGION = Region(
+    "HCM",
+    "https://gis.vn/",
+    Bbox(minx=106.0, miny=8.5, maxx=107.6, maxy=11.6),
+    "VNM",
+    "+07:00",
+    (
+        (1, Path("data/HCM/geoboundaries/HCM-1.shp")),
+        (2, Path("data/HCM/geoboundaries/HCM-2.shp")),
+    ),
+    ((1, "ma_tinh"), (2, "ma_xa")),
 )
 
 
@@ -54,10 +68,10 @@ def test_invalid_country_name_iso3_mismatch():
             BBOX,
             "VNM",
             "+07:00",
-            {
-                1: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp",
-                2: DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp",
-            },
+            (
+                (1, Path(DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM1.shp")),
+                (2, Path(DATA_PATH / "VNM/geoboundaries/geoBoundaries-VNM-ADM2.shp")),
+            ),
             "shapeID",
         )
 
@@ -107,11 +121,13 @@ def test_region_gadm(region_gadm):
         ),
         "VNM",
         "+07:00",
-        {
-            i: Path.home() / f".local/share/geoglue/VNM/gadm41/gadm41_VNM_{i}.shp"
-            for i in range(4)
-        },
-        {i: f"GID_{i}" for i in range(4)},
+        (
+            tuple(
+                (i, Path.home() / f".local/share/geoglue/VNM/gadm41/gadm41_VNM_{i}.shp")
+                for i in range(4)
+            )
+        ),
+        (tuple((i, f"GID_{i}") for i in range(4))),
     )
 
 
@@ -153,6 +169,14 @@ def test_get_admin():
     [("VNM", EXAMPLE_REGION), ("VNM-2", EXAMPLE_REGION)],
 )
 def test_valid_get_region(region_name, region):
+    assert get_region(region_name, REGION_FILE, fallback="geoboundaries") == region
+
+
+@pytest.mark.parametrize(
+    "region_name,region",
+    [("HCM", EXAMPLE_CUSTOM_REGION), ("HCM-2", EXAMPLE_CUSTOM_REGION)],
+)
+def test_custom_region(region_name, region):
     assert get_region(region_name, REGION_FILE, fallback="geoboundaries") == region
 
 
