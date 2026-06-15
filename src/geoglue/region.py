@@ -8,25 +8,23 @@ calculating extents or geospatial bounds, and calculating timezone offsets.
 from __future__ import annotations
 
 import dataclasses
-import re
-import logging
 import datetime
-from typing import Mapping, Literal
+import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
-import pytz
-import pycountry
-import requests
 import geopandas as gpd
-
+import pycountry
+import pytz
+import requests
 import tomli as toml
 
 # import warnings
-
-from .util import download_file
-from .types import Bbox
 from .paths import geoglue_data_path
+from .types import Bbox
+from .util import download_file
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +135,7 @@ class Region(ZonedBaseRegion):
             self.tz,
             adm,
             admin_files_map[adm],
-            dict(self.pk)[adm] if isinstance(self.pk, tuple) else self.pk
+            dict(self.pk)[adm] if isinstance(self.pk, tuple) else self.pk,
         )
 
 
@@ -223,6 +221,7 @@ def get_bbox(path: str | Path) -> Bbox:
     data = gpd.read_file(path)
     return Bbox(*data.total_bounds)
 
+
 def gadm(
     iso3: str,
     localize_date: datetime.datetime = LOCALIZE_DATE,
@@ -271,7 +270,8 @@ def gadm(
             )
         logger.info("GADM data downloaded to %s", path_geodata)
     admins = {
-        int(path.stem.split("_")[-1]): path for path in sorted(path_geodata.glob("*.shp"))
+        int(path.stem.split("_")[-1]): path
+        for path in sorted(path_geodata.glob("*.shp"))
     }
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
@@ -337,7 +337,9 @@ def geoboundaries(
     admins = {i: path_geodata / f"geoBoundaries-{iso3}-ADM{i}.shp" for i in [1, 2]}
     if (tzoffset := tzoffset or get_timezone(iso3, localize_date)) is None:
         raise ValueError("No unique timezone offset found or supplied")
-    return Country(iso3, url, get_bbox(admins[1]), iso3, tzoffset, tuple(admins.items()), "shapeID")
+    return Country(
+        iso3, url, get_bbox(admins[1]), iso3, tzoffset, tuple(admins.items()), "shapeID"
+    )
 
 
 def get_region(
@@ -414,7 +416,7 @@ def get_region(
     bbox = Bbox(minx, miny, maxx, maxy)
     if admin is not None and admin not in admin_files:
         raise ValueError(f"No shapefile specified for {admin=}, which is required")
-    
+
     # make it tuple such that it is hashable
     # this is important for caching functionality in dart-pipeline downstream
     if isinstance(pk, dict):
