@@ -91,7 +91,7 @@ class Region(ZonedBaseRegion):
     "Path to shapefiles, indexed by administrative level"
 
     # This must be a tuple for Region to be hashable (for caching in dart-pipeline)
-    pk: tuple[tuple[int, str], ...] | str | str
+    pk: tuple[tuple[int, str], ...] | str
     """Column ID that is used as primary key to identify regions
     in shapefile, indexed by administrative level.
 
