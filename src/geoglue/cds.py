@@ -22,7 +22,7 @@ import xarray as xr
 
 from .paths import geoglue_cache_path, geoglue_data_path
 from .region import VALID_ISO3, ZonedBaseRegion
-from .util import find_unique_time_coord, get_first_monday
+from .util import find_unique_time_coord, get_first_monday, get_last_sunday
 
 logger = logging.getLogger(__name__)
 
@@ -895,7 +895,7 @@ class DatasetPool:
             raise FileNotFoundError(
                 f"Positive shift_hours={self.shift_hours} require preceding year at {self.path(year - 1)}"
             )
-        if self.shift_hours < 0 and not self.path(year + 1).exists():
+        if self.shift_hours < 0 and not is_part_year and not self.path(year + 1).exists():
             raise FileNotFoundError(
                 f"Negative shift_hours={self.shift_hours} require succeeding year at {self.path(year + 1)}"
             )
@@ -930,6 +930,7 @@ class DatasetPool:
 
         return ds
 
+    # TODO: handle scenario for when endyear is a partial year
     def weekly_reduce(
         self,
         year: int,
@@ -995,20 +996,30 @@ class DatasetPool:
             case "instant":
                 ds = _time_reduce(self[year].instant, "D", how_daily)
                 ds_prev = _time_reduce(self[year - 1].instant, "D", how_daily)
-                ds_next = _time_reduce(self[year + 1].instant, "D", how_daily)
+
+                if year not in self.part_years:
+                    ds_next = _time_reduce(self[year + 1].instant, "D", how_daily)
 
             case "accum":
                 ds = _time_reduce(self[year].accum, "D", "sum")
                 ds_prev = _time_reduce(self[year - 1].accum, "D", "sum")
-                ds_next = _time_reduce(self[year + 1].accum, "D", "sum")
+
+                if year not in self.part_years:
+                    ds_next = _time_reduce(self[year + 1].accum, "D", "sum")
 
         if window > 0:  # needs previous year
             ds = xr.concat([ds_prev, ds, ds_next], dim=time_dim)
-        else:
+        elif year not in self.part_years: # needs following year (when year is not a completed year)
             ds = xr.concat([ds, ds_next], dim=time_dim)
 
-        start_date = get_first_monday(year)
-        end_date = get_first_monday(year + 1) - datetime.timedelta(days=1)
+        start_date = get_first_monday(year)  
+        
+        if year not in self.part_years:
+            end_date = get_first_monday(year + 1) - datetime.timedelta(days=1)
+        else:
+            last_timepoint = ds.instant.valid_time.values.max()
+            end_date = get_last_sunday(pd.Timestamp(last_timepoint).date())
+
         if window > 0:
             start_date -= datetime.timedelta(days=7 * window)
         ds = ds.sel({time_dim: slice(start_date.isoformat(), end_date.isoformat())})
