@@ -115,6 +115,11 @@ def get_last_sunday(year: int) -> datetime.date:
         return d + datetime.timedelta(days=7)
     else:
         return d
+    
+def get_last_sunday(date: datetime.date) -> datetime.date:
+    "Gets the previous Sunday given a specific date"
+    days_since_sunday = (date.weekday() + 1) % 7
+    return date - datetime.timedelta(days=days_since_sunday)
 
 
 def sha256(file_path: str | Path, prefix: bool = False) -> str:
