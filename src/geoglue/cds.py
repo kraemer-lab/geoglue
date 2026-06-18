@@ -985,12 +985,20 @@ class DatasetPool:
                     raise ValueError(
                         "Invalid aggregation metric for 'accum' variable: must be 'sum' or unspecified"
                     )
-        if not self.path(year - 1).exists() or not (
-            self.path(year + 1).exists() or self.path_min_part_year(year + 1).exists()
-        ):
+                
+        if not self.path(year - 1).exists():
             raise FileNotFoundError(
-                f"Both data for {year - 1} and {year + 1} must be present for weekly statistics for {year=}"
+                f"Data for {year - 1} are required."
             )
+
+        if year not in self.part_years:
+            if not (
+                self.path(year + 1).exists()
+                or self.path_min_part_year(year + 1).exists()
+            ):
+                raise FileNotFoundError(
+                    f"Data for {year + 1} are required."
+                )
 
         match vartype:
             case "instant":
