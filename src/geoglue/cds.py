@@ -1016,8 +1016,9 @@ class DatasetPool:
                     ds_next = _time_reduce(self[year + 1].accum, "D", "sum")
 
         if window > 0:  # needs previous year
-            ds = xr.concat([ds_prev, ds, ds_next], dim=time_dim)
-        elif year not in self.part_years: # needs following year (when year is not a completed year)
+            ds = xr.concat([ds_prev, ds], dim=time_dim)
+        
+        if year not in self.part_years: # needs following year (when year is a completed year)
             ds = xr.concat([ds, ds_next], dim=time_dim)
 
         start_date = get_first_monday(year)  
