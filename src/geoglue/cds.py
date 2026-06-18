@@ -1025,7 +1025,7 @@ class DatasetPool:
         if year not in self.part_years:
             end_date = get_first_monday(year + 1) - datetime.timedelta(days=1)
         else:
-            last_timepoint = ds.instant.valid_time.values.max()
+            last_timepoint = ds.coords[time_dim].max().item()
             end_date = get_last_sunday(pd.Timestamp(last_timepoint).date())
 
         if window > 0:
