@@ -226,3 +226,6 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# vscode config
+.vscode
