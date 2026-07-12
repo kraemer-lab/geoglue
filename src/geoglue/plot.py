@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def plot(
     da: xr.DataArray,
-    isel: int | tuple[int],
+    isel: int | tuple[int, ...],
     cmap: str = "viridis",
     output: str | None = None,
     geometry: str = ".",
