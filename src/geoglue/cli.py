@@ -294,7 +294,7 @@ def zonalstats(
     da = compute_config(cfg)
     nna = da.isnull().sum().item()
     da.to_netcdf(cfg.output)
-    print(f"zonalstats\tNA={nna}", cfg)
+    print(f"zonalstats\tNA={nna} geoglue zonalstats {cfg}")
     end_time = datetime.datetime.now(datetime.timezone.utc)
     print(
         f"zonalstats\tconf={gcfg.source} end={end_time.isoformat()} elapsed={(end_time - start_time).seconds}s"
