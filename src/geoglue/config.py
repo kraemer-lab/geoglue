@@ -19,6 +19,12 @@ from geoglue.util import logfmt_escape
 
 logger = logging.getLogger(__name__)
 
+
+class _ArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> typing.NoReturn:
+        raise argparse.ArgumentError(None, message)
+
+
 # Allowed resample operations (extendable)
 ResampleType = typing.Literal["remapbil", "remapdis", "sremapbil", "off"]
 
@@ -171,7 +177,7 @@ class ZonalStatsConfig:
 
     @staticmethod
     def from_cli(s: str) -> ZonalStatsConfig:
-        parser = argparse.ArgumentParser()
+        parser = _ArgumentParser()
         parser.add_argument("raster")
         parser.add_argument("region")
         parser.add_argument("--weights")
