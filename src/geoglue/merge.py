@@ -10,6 +10,41 @@ from collections.abc import Iterable
 
 import xarray as xr
 
+from .config import ZonalStatsConfig
+
+
+def _migrate_geoglue_config(d: dict[str, str | None]) -> dict[str, str | None]:
+    """Convert legacy geoglue_config attribute to history entries.
+
+    Logfmt-style values are converted to CLI style via a from_str/str roundtrip.
+    Lines that cannot be parsed are kept as-is.
+    """
+    if "geoglue_config" not in d:
+        return d
+    result = dict(d)
+    config_val = result.pop("geoglue_config")
+    if config_val is None:
+        return result
+    if isinstance(config_val, bytes):
+        config_val = config_val.decode("utf-8")
+    migrated_lines = []
+    for line in str(config_val).splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            cli_repr = str(ZonalStatsConfig.from_str(line))
+        except Exception:
+            cli_repr = line
+        migrated_lines.append(f"geoglue zonalstats {cli_repr}")
+    migrated = "\n".join(migrated_lines)
+    existing = result.get("history") or ""
+    if isinstance(existing, bytes):
+        existing = existing.decode("utf-8")
+    combined = (migrated + "\n" + str(existing)).strip()
+    result["history"] = combined if combined else None
+    return result
+
 
 def variable_merge(files: list[Path]) -> xr.Dataset:
     return xr.merge(
@@ -27,7 +62,7 @@ def combine_attrs(
     Return: dict of combined attrs
     """
     dicts: list[dict[str, str | None]] = [
-        d if d is not None else {} for d in attrs_list
+        _migrate_geoglue_config(d if d is not None else {}) for d in attrs_list
     ]
 
     # collect ordered set of keys
@@ -44,17 +79,18 @@ def combine_attrs(
         if not vals:
             continue
 
-        if key == "geoglue_config":
-            # join unique values while preserving order
+        if key == "history":
+            # merge history lines, deduplicating while preserving order
             seen: set[str] = set()
-            ordered_unique = []
+            ordered_unique: list[str] = []
             for v in vals:
-                # if v is bytes, convert to str; otherwise keep as-is
                 if isinstance(v, bytes):
                     v = v.decode("utf-8")
-                if v not in seen:
-                    seen.add(v)
-                    ordered_unique.append(str(v))
+                for line in str(v).splitlines():
+                    line = line.strip()
+                    if line and line not in seen:
+                        seen.add(line)
+                        ordered_unique.append(line)
             out[key] = "\n".join(ordered_unique)
         else:
             # keep the first value

@@ -3,7 +3,13 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from geoglue.merge import combine_attrs, variable_merge, _group_datasets, merge_datasets
+from geoglue.merge import (
+    combine_attrs,
+    variable_merge,
+    _group_datasets,
+    merge_datasets,
+    _migrate_geoglue_config,
+)
 
 
 def make_dataset(
@@ -48,34 +54,120 @@ class TestCombineAttrs:
         result = combine_attrs([{"a": "1"}, {"b": "2"}], None)
         assert result == {"a": "1", "b": "2"}
 
-    def test_geoglue_config_deduplicated(self):
-        result = combine_attrs(
-            [{"geoglue_config": "cfg1"}, {"geoglue_config": "cfg1"}], None
-        )
-        assert result == {"geoglue_config": "cfg1"}
+    def test_history_deduplicated(self):
+        result = combine_attrs([{"history": "step1"}, {"history": "step1"}], None)
+        assert result == {"history": "step1"}
 
-    def test_geoglue_config_unique_joined_with_newline(self):
+    def test_history_unique_lines_joined(self):
+        result = combine_attrs([{"history": "step1"}, {"history": "step2"}], None)
+        assert result == {"history": "step1\nstep2"}
+
+    def test_history_bytes_decoded(self):
+        result = combine_attrs([{"history": b"step1"}, {"history": "step2"}], None)
+        assert result == {"history": "step1\nstep2"}
+
+    def test_history_order_preserved(self):
+        result = combine_attrs(
+            [{"history": "step3"}, {"history": "step1"}, {"history": "step2"}],
+            None,
+        )
+        assert result == {"history": "step3\nstep1\nstep2"}
+
+    def test_history_multiline_deduplicated(self):
+        result = combine_attrs(
+            [{"history": "step1\nstep2"}, {"history": "step2\nstep3"}], None
+        )
+        assert result == {"history": "step1\nstep2\nstep3"}
+
+    def test_geoglue_config_migrated_logfmt_to_cli(self):
+        logfmt = " ".join(
+            [
+                "raster=data/raster.nc",
+                "shapefile=data/shapefile.shp",
+                "shapefile_id=ADMIN",
+                "output=output.zs.nc",
+                "operation=mean(coverage_weight=area_spherical_km2)",
+                "resample=off",
+            ]
+        )
+        result = _migrate_geoglue_config({"geoglue_config": logfmt})
+        assert result == {
+            "history": "geoglue zonalstats data/raster.nc data/shapefile.shp::ADMIN"
+            " --operation=mean(coverage_weight=area_spherical_km2) --output=output.zs.nc"
+        }
+        assert "geoglue_config" not in result
+
+    def test_geoglue_config_multiline_logfmt_migrated(self):
+        def logfmt(raster: str, output: str) -> str:
+            return " ".join(
+                [
+                    f"raster={raster}",
+                    "shapefile=data/shapefile.shp",
+                    "shapefile_id=ADMIN",
+                    f"output={output}",
+                    "operation=mean(coverage_weight=area_spherical_km2)",
+                    "resample=off",
+                ]
+            )
+
+        config_val = (
+            logfmt("data/r1.nc", "r1.zs.nc") + "\n" + logfmt("data/r2.nc", "r2.zs.nc")
+        )
+        result = _migrate_geoglue_config({"geoglue_config": config_val})
+        assert result == {
+            "history": (
+                "geoglue zonalstats data/r1.nc data/shapefile.shp::ADMIN"
+                " --operation=mean(coverage_weight=area_spherical_km2) --output=r1.zs.nc\n"
+                "geoglue zonalstats data/r2.nc data/shapefile.shp::ADMIN"
+                " --operation=mean(coverage_weight=area_spherical_km2) --output=r2.zs.nc"
+            )
+        }
+
+    def test_geoglue_config_migration_preserves_existing_history(self):
+        logfmt = " ".join(
+            [
+                "raster=data/raster.nc",
+                "shapefile=data/shapefile.shp",
+                "shapefile_id=ADMIN",
+                "output=output.zs.nc",
+                "operation=mean(coverage_weight=area_spherical_km2)",
+                "resample=off",
+            ]
+        )
+        result = _migrate_geoglue_config(
+            {"geoglue_config": logfmt, "history": "prior step"}
+        )
+        assert result["history"].endswith("\nprior step")
+        assert result["history"].startswith("geoglue zonalstats data/raster.nc")
+        assert "geoglue_config" not in result
+
+    def test_geoglue_config_unparseable_kept_as_is(self):
+        result = _migrate_geoglue_config({"geoglue_config": "not-valid-logfmt"})
+        assert result == {"history": "geoglue zonalstats not-valid-logfmt"}
+
+    def test_geoglue_config_bytes_migrated(self):
+        logfmt = b" ".join(
+            [
+                b"raster=data/raster.nc",
+                b"shapefile=data/shapefile.shp",
+                b"shapefile_id=ADMIN",
+                b"output=output.zs.nc",
+                b"operation=mean(coverage_weight=area_spherical_km2)",
+                b"resample=off",
+            ]
+        )
+        result = _migrate_geoglue_config({"geoglue_config": logfmt})
+        assert result == {
+            "history": "geoglue zonalstats data/raster.nc data/shapefile.shp::ADMIN"
+            " --operation=mean(coverage_weight=area_spherical_km2) --output=output.zs.nc"
+        }
+
+    def test_combine_attrs_migrates_geoglue_config(self):
         result = combine_attrs(
             [{"geoglue_config": "cfg1"}, {"geoglue_config": "cfg2"}], None
         )
-        assert result == {"geoglue_config": "cfg1\ncfg2"}
-
-    def test_geoglue_config_bytes_decoded(self):
-        result = combine_attrs(
-            [{"geoglue_config": b"cfg1"}, {"geoglue_config": "cfg2"}], None
-        )
-        assert result == {"geoglue_config": "cfg1\ncfg2"}
-
-    def test_geoglue_config_order_preserved(self):
-        result = combine_attrs(
-            [
-                {"geoglue_config": "cfg3"},
-                {"geoglue_config": "cfg1"},
-                {"geoglue_config": "cfg2"},
-            ],
-            None,
-        )
-        assert result == {"geoglue_config": "cfg3\ncfg1\ncfg2"}
+        assert result == {"history": "geoglue zonalstats cfg1\ngeoglue zonalstats cfg2"}
+        assert "geoglue_config" not in result
 
 
 # ── variable_merge ────────────────────────────────────────────────────────────
@@ -250,7 +342,18 @@ class TestMergeDatasets:
         result = merge_datasets([f])
         assert result.attrs.get("source") == "test"
 
-    def test_merge_combines_geoglue_config(self, tmp_path):
+    def test_merge_combines_history(self, tmp_path):
+        t = pd.date_range("2020-01-01", periods=3)
+        f1 = tmp_path / "temp.nc"
+        f2 = tmp_path / "precip.nc"
+        make_dataset(["temp"], t, attrs={"history": "step1"}).to_netcdf(f1)
+        make_dataset(["precip"], t, attrs={"history": "step2"}).to_netcdf(f2)
+
+        result = merge_datasets([f1, f2])
+        assert "step1" in result.attrs["history"]
+        assert "step2" in result.attrs["history"]
+
+    def test_merge_migrates_geoglue_config_to_history(self, tmp_path):
         t = pd.date_range("2020-01-01", periods=3)
         f1 = tmp_path / "temp.nc"
         f2 = tmp_path / "precip.nc"
@@ -258,8 +361,9 @@ class TestMergeDatasets:
         make_dataset(["precip"], t, attrs={"geoglue_config": "cfg2"}).to_netcdf(f2)
 
         result = merge_datasets([f1, f2])
-        assert "cfg1" in result.attrs["geoglue_config"]
-        assert "cfg2" in result.attrs["geoglue_config"]
+        assert "geoglue_config" not in result.attrs
+        assert "geoglue zonalstats cfg1" in result.attrs["history"]
+        assert "geoglue zonalstats cfg2" in result.attrs["history"]
 
     def test_reverse_order_input_same_result(self, tmp_path):
         t1 = pd.date_range("2020-01-01", periods=3)
