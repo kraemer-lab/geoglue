@@ -108,18 +108,22 @@ def get_first_monday(year: int) -> datetime.date:
     return datetime.datetime.strptime(f"{year}-W01-1", "%Y-W%W-%u").date()
 
 
-def get_last_sunday(year: int) -> datetime.date:
-    "Gets last Sunday of year"
-    d = datetime.datetime.strptime(f"{year}-W51-7", "%Y-W%W-%u").date()
-    if (d + datetime.timedelta(days=7)).year == year:  # one more week in the year!
-        return d + datetime.timedelta(days=7)
-    else:
+def get_last_sunday(x: int | datetime.date) -> datetime.date:
+    """Gets the last Sunday of a year or the previous Sunday of a date."""
+
+    if isinstance(x, int):
+        d = datetime.datetime.strptime(f"{x}-W51-7", "%Y-W%W-%u").date()
+
+        if (d + datetime.timedelta(days=7)).year == x: # one more week in the year!
+            return d + datetime.timedelta(days=7)
+
         return d
-    
-def get_last_sunday(date: datetime.date) -> datetime.date:
-    "Gets the previous Sunday given a specific date"
-    days_since_sunday = (date.weekday() + 1) % 7
-    return date - datetime.timedelta(days=days_since_sunday)
+
+    if isinstance(x, datetime.date):
+        days_since_sunday = (x.weekday() + 1) % 7
+        return x - datetime.timedelta(days=days_since_sunday)
+
+    raise TypeError(f"Expected int or datetime.date, got {type(x).__name__}")
 
 
 def sha256(file_path: str | Path, prefix: bool = False) -> str:
