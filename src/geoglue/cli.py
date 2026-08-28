@@ -1,11 +1,12 @@
-"""geoglue command-lineOPER interface"""
+"""geoglue command-line interface"""
+# pyright: reportUnknownMemberType=none
 
 import datetime
 import tempfile
-import fileinput
 from pathlib import Path
+from collections.abc import Iterable
 
-from cdo import Cdo
+from cdo import Cdo  # pyright: ignore[reportMissingTypeStubs]
 import click
 import xarray as xr
 import warnings
@@ -69,7 +70,7 @@ def cli_plot(
     variable = var or vars[0]
     da = ds[variable]
 
-    isel_val: int | tuple = 0
+    isel_val: int | tuple[int, ...] = 0
     if "," not in isel:
         isel_val = int(isel)
     else:
@@ -78,17 +79,12 @@ def cli_plot(
     plot(da, isel_val, cmap, output, geometry)
 
 
-@cli.command("merge", help="Merges datasets specified on standard input")
+@cli.command("merge", help="Merges datasets")
+@click.argument("files", nargs=-1, type=click.Path(exists=True))
 @click.option("--dim", help="Dimension to concatenate on", default="time")
 @click.option("-o", "--output", help="Output file to write to", required=True)
-@click.option(
-    "--file",
-    help="Merge file to use",
-    type=click.Path(exists=True, dir_okay=False, readable=True),
-)
-def merge(dim: str, output: str, file: str):
-    file = "-" if file is None else file
-    ds = merge_datasets(fileinput.input(file, encoding="utf-8"), dim=dim)
+def merge(files: Iterable[Path], dim: str, output: str):
+    ds = merge_datasets(files, dim=dim)
     ds.to_netcdf(output)
     print(output)
 
@@ -99,7 +95,7 @@ def merge(dim: str, output: str, file: str):
 )
 @click.pass_context
 def stats(ctx: click.Context, files: tuple[str]):
-    verbose = ctx.obj["verbose"] > 0
+    verbose: bool = ctx.obj["verbose"] > 0
     for file in files:
         print_file_stats(Path(file), verbose=verbose)
 
@@ -298,7 +294,7 @@ def zonalstats(
     da = compute_config(cfg)
     nna = da.isnull().sum().item()
     da.to_netcdf(cfg.output)
-    print(f"zonalstats\tNA={nna}", cfg)
+    print(f"zonalstats\tNA={nna} geoglue zonalstats {cfg}")
     end_time = datetime.datetime.now(datetime.timezone.utc)
     print(
         f"zonalstats\tconf={gcfg.source} end={end_time.isoformat()} elapsed={(end_time - start_time).seconds}s"

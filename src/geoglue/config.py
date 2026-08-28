@@ -1,20 +1,29 @@
 """Zonal stats task configuration"""
+# pyright: reportUnusedCallResult=none, reportAny=none
 
 from __future__ import annotations
 import os
 import shlex
 import typing
 import logging
+import argparse
 import tomllib as toml
 from dataclasses import dataclass
 from pathlib import Path
 
 import geopandas as gpd
+from typing_extensions import override
 
 from geoglue.types import Bbox
 from geoglue.util import logfmt_escape
 
 logger = logging.getLogger(__name__)
+
+
+class _ArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> typing.NoReturn:
+        raise argparse.ArgumentError(None, message)
+
 
 # Allowed resample operations (extendable)
 ResampleType = typing.Literal["remapbil", "remapdis", "sremapbil", "off"]
@@ -106,7 +115,7 @@ class GeoglueConfig:
 
 @dataclass(frozen=True)
 class CropConfig:
-    "Instantiated version of CropConfigTemplate"
+    "Crop configuration"
 
     raster: Path
     bbox: Bbox
@@ -125,7 +134,7 @@ class CropConfig:
 
 @dataclass(frozen=True)
 class ZonalStatsConfig:
-    "Instantiated version of ZonalStatsTemplate"
+    "Zonal statistics configuration"
 
     # top-level
     raster: Path
@@ -137,31 +146,82 @@ class ZonalStatsConfig:
     weights: Path | None = None
     resample: ResampleType = "off"
     tmp_path: Path | None = None
+    region: str | None = None
+    config: Path | None = None
 
     def check_exists(self):
         for f in ["raster", "shapefile", "weights"]:
             if getattr(self, f) and not getattr(self, f).exists():
                 raise FileNotFoundError(f"{f} = {getattr(self, f)} file not found")
 
+    @override
     def __str__(self):
-        _raster = f"raster={logfmt_escape(self.raster)}"
-        _shapefile = f"shapefile={logfmt_escape(self.shapefile)}"
-        _output = f"output={logfmt_escape(self.output)}"
-        _weights = f"weights={logfmt_escape(self.weights)}"
+        if self.region:
+            _region = self.region
+        else:
+            _region = logfmt_escape(self.shapefile) + "::" + self.shapefile_id
+        _raster = logfmt_escape(self.raster)
+        _output = f"--output={logfmt_escape(self.output)}"
+        _weights = f"--weights={logfmt_escape(self.weights)}" if self.weights else ""
+        _resample = f"--resample={self.resample}" if self.resample != "off" else ""
+        _operation = f"--operation={self.operation}"
         return " ".join(
-            [
-                _raster,
-                _shapefile,
-                f"shapefile_id={self.shapefile_id}",
-                _output,
-                f"operation={self.operation}",
-                _weights,
-                f"resample={self.resample}",
-            ]
+            x for x in [_raster, _region, _operation, _weights, _resample, _output] if x
         )
 
     @staticmethod
     def from_str(s: str) -> ZonalStatsConfig:
+        if "raster=" in s:
+            return ZonalStatsConfig.from_logfmt(s)
+        return ZonalStatsConfig.from_cli(s)
+
+    @staticmethod
+    def from_cli(s: str) -> ZonalStatsConfig:
+        parser = _ArgumentParser()
+        parser.add_argument("raster")
+        parser.add_argument("region")
+        parser.add_argument("--weights")
+        parser.add_argument("--output", required=True)
+        parser.add_argument("--resample")
+        parser.add_argument("--operation")
+        parser.add_argument("--config")
+        args = parser.parse_args(shlex.split(s))
+        _weights = Path(args.weights) if args.weights else None
+        _output = Path(args.output)
+        _resample = args.resample or "off"
+        if args.operation is None:
+            _operation = (
+                "mean(coverage_weight=area_spherical_km2)"
+                if _weights is None
+                else "weighted_mean(coverage_weight=area_spherical_km2,default_weight=0)"
+            )
+        else:
+            _operation = args.operation
+        config = read_config(args.config)
+        if "::" in args.region:
+            shp = ShapefileConfig.from_str(args.region)
+            _region = None
+        else:
+            _region = args.region
+            try:
+                shp = config.region[args.region]
+            except KeyError:
+                raise KeyError(
+                    f"Region {args.region!r} not found in configuration {args.config or DEFAULT_PATH!r}"
+                )
+        return ZonalStatsConfig(
+            raster=Path(args.raster),
+            shapefile=shp.file,
+            shapefile_id=shp.pk,
+            output=_output,
+            operation=config.operation.get(_operation, _operation),
+            resample=_resample,
+            weights=_weights,
+            config=config.source,
+        )
+
+    @staticmethod
+    def from_logfmt(s: str) -> ZonalStatsConfig:
         parts = shlex.split(s)
         kv = {}
         required_keys = [

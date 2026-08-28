@@ -8,13 +8,11 @@ import pytest
 from geoglue.region import (
     Country,
     CountryAdministrativeLevel,
+    Region,
     gadm,
     geoboundaries,
     get_region,
     get_timezone,
-    Country,
-    get_region,
-    Region
 )
 from geoglue.types import Bbox
 from geoglue.util import read_geotiff
@@ -45,19 +43,14 @@ EXAMPLE_REGION = Country(
 EXAMPLE_CUSTOM_REGION = Region(
     "HCM",
     "https://gis.vn/",
-    Bbox(
-        minx= 106.0,
-        miny= 8.5,
-        maxx= 107.6,
-        maxy= 11.6
-    ),
+    Bbox(minx=106.0, miny=8.5, maxx=107.6, maxy=11.6),
     "VNM",
     "+07:00",
     (
-        (1, Path("data/HCM/geoboundaries/HCM-1.shp")) ,
-        (2, Path("data/HCM/geoboundaries/HCM-2.shp"))
+        (1, Path("data/HCM/geoboundaries/HCM-1.shp")),
+        (2, Path("data/HCM/geoboundaries/HCM-2.shp")),
     ),
-    ((1, "ma_tinh"),(2, "ma_xa")),
+    ((1, "ma_tinh"), (2, "ma_xa")),
 )
 
 
@@ -129,11 +122,12 @@ def test_region_gadm(region_gadm):
         "VNM",
         "+07:00",
         (
-            tuple((i, Path.home() / f".local/share/geoglue/VNM/gadm41/gadm41_VNM_{i}.shp") for i in range(4))
+            tuple(
+                (i, Path.home() / f".local/share/geoglue/VNM/gadm41/gadm41_VNM_{i}.shp")
+                for i in range(4)
+            )
         ),
-        (
-            tuple((i, f"GID_{i}") for i in range(4))
-        ),
+        (tuple((i, f"GID_{i}") for i in range(4))),
     )
 
 
@@ -184,6 +178,7 @@ def test_valid_get_region(region_name, region):
 )
 def test_custom_region(region_name, region):
     assert get_region(region_name, REGION_FILE, fallback="geoboundaries") == region
+
 
 @pytest.mark.parametrize("region", ["invalid_tz", "invalid_bounds"])
 def test_invalid_get_region(region):

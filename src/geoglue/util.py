@@ -118,6 +118,11 @@ def get_last_sunday(x: int | datetime.date) -> datetime.date:
             return d + datetime.timedelta(days=7)
 
         return d
+    
+def get_last_sunday(date: datetime.date) -> datetime.date:
+    "Gets the previous Sunday given a specific date"
+    days_since_sunday = (date.weekday() + 1) % 7
+    return date - datetime.timedelta(days=days_since_sunday)
 
     if isinstance(x, datetime.date):
         days_since_sunday = (x.weekday() + 1) % 7
