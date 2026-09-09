@@ -1,6 +1,6 @@
-import xarray as xr
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 
 def collapse_step_to_month_dataarray(

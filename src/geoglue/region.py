@@ -33,7 +33,7 @@ GADM_EXT = SHP_EXT + ["cpg"]
 GEOBOUNDARIES_EXT = SHP_EXT
 
 # See significance of LOCALIZE_DATE in the get_timezone()
-LOCALIZE_DATE = datetime.datetime(2022, 1, 1)
+LOCALIZE_DATE = datetime.datetime(2022, 1, 1)  # noqa: DTZ001
 
 VALID_ISO3 = [c.alpha_3 for c in pycountry.countries]  # type: ignore
 
