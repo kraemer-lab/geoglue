@@ -116,12 +116,13 @@ def get_last_sunday(x: int | datetime.date) -> datetime.date:
         d = datetime.datetime.strptime(f"{x}-W51-7", "%Y-W%W-%u").astimezone().date()
         if (d + datetime.timedelta(days=7)).year == x:  # one more week in the year!
             return d + datetime.timedelta(days=7)
-
         return d
-    
-    if isinstance(x, datetime.date):
+    elif isinstance(x, datetime.date):
+        # Gets the previous Sunday given a specific date
         days_since_sunday = (x.weekday() + 1) % 7
         return x - datetime.timedelta(days=days_since_sunday)
+    else:
+        raise TypeError(f"Expected `int` or `datetime.date`, got {type(x).__name__}")
 
 
 def sha256(file_path: str | Path, prefix: bool = False) -> str:
