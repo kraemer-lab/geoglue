@@ -19,6 +19,8 @@ from geoglue.cds import (
 from geoglue.region import Country, CountryAdministrativeLevel, Region
 from geoglue.types import Bbox
 
+# ruff: noqa: DTZ001, DTZ002
+
 BRB = Country(
     "BRB",
     "https://gadm.org",

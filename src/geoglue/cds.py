@@ -12,8 +12,9 @@ import operator
 import re
 import warnings
 import zipfile
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Iterable, Literal, NamedTuple, Sequence
+from typing import Literal, NamedTuple
 
 import cdsapi
 import numpy as np
@@ -22,7 +23,9 @@ import xarray as xr
 
 from .paths import geoglue_cache_path, geoglue_data_path
 from .region import VALID_ISO3, ZonedBaseRegion
-from .util import find_unique_time_coord, get_first_monday
+from .util import find_unique_time_coord, get_first_monday, get_last_sunday
+
+# ruff: noqa: DTZ002
 
 logger = logging.getLogger(__name__)
 
@@ -165,9 +168,9 @@ class CdsPath(NamedTuple):
     Tuple containing paths to instant and accumulated variables from cdsapi
     """
 
-    instant: Path | None
+    instant: Path
     "Path to instant variable dataset"
-    accum: Path | None
+    accum: Path
     "Path to accumulated variable dataset"
 
     def as_dataset(self, drop_vars: list[str] = DROP_VARS) -> CdsDataset:
@@ -709,7 +712,7 @@ class DatasetPool:
         match_groups = [m.groups() for m in matches if m]
         logger.debug(f"DatasetPool match groups: {match_groups}")
         part_match_groups = [m.groups() for m in part_matches if m]
-        parents = set(p.parent for p in self.paths)
+        parents = {p.parent for p in self.paths}
         if len(parents) != 1:
             raise ValueError(
                 f"All files in DatasetPool must be in same folder, found multiple parent folders: {parents}"
@@ -727,7 +730,7 @@ class DatasetPool:
         self.part_chunks: list[tuple[str, str | None]] = sorted(
             set(map(operator.itemgetter(1, 2), part_match_groups))
         )
-        self.part_years = list(set([int(x[0].split("-")[0]) for x in self.part_chunks]))
+        self.part_years = list({int(x[0].split("-")[0]) for x in self.part_chunks})
         if len(stubs) > 1 or len(iso3) > 1:
             raise ValueError(
                 f"Multiple {iso3=} or {stubs=} not allowed in DatasetPool, specify a stricter path glob"
@@ -809,7 +812,7 @@ class DatasetPool:
 
         def extract_month(f):
             mo = f.stem.split("-")[2]
-            if mo.startswith("1") or mo.startswith("0"):
+            if mo.startswith(("1", "0")):
                 return mo
             return None
 
@@ -895,7 +898,11 @@ class DatasetPool:
             raise FileNotFoundError(
                 f"Positive shift_hours={self.shift_hours} require preceding year at {self.path(year - 1)}"
             )
-        if self.shift_hours < 0 and not self.path(year + 1).exists():
+        if (
+            self.shift_hours < 0
+            and not is_part_year
+            and not self.path(year + 1).exists()
+        ):
             raise FileNotFoundError(
                 f"Negative shift_hours={self.shift_hours} require succeeding year at {self.path(year + 1)}"
             )
@@ -930,6 +937,7 @@ class DatasetPool:
 
         return ds
 
+    # TODO: handle scenario for when endyear is a partial year
     def weekly_reduce(
         self,
         year: int,
@@ -984,31 +992,46 @@ class DatasetPool:
                     raise ValueError(
                         "Invalid aggregation metric for 'accum' variable: must be 'sum' or unspecified"
                     )
-        if not self.path(year - 1).exists() or not (
+
+        if not self.path(year - 1).exists():
+            raise FileNotFoundError(f"Data for {year - 1} are required.")
+
+        if year not in self.part_years and not (
             self.path(year + 1).exists() or self.path_min_part_year(year + 1).exists()
         ):
-            raise FileNotFoundError(
-                f"Both data for {year - 1} and {year + 1} must be present for weekly statistics for {year=}"
-            )
+            raise FileNotFoundError(f"Data for {year + 1} are required.")
 
         match vartype:
             case "instant":
                 ds = _time_reduce(self[year].instant, "D", how_daily)
                 ds_prev = _time_reduce(self[year - 1].instant, "D", how_daily)
-                ds_next = _time_reduce(self[year + 1].instant, "D", how_daily)
+
+                if year not in self.part_years:
+                    ds_next = _time_reduce(self[year + 1].instant, "D", how_daily)
 
             case "accum":
                 ds = _time_reduce(self[year].accum, "D", "sum")
                 ds_prev = _time_reduce(self[year - 1].accum, "D", "sum")
-                ds_next = _time_reduce(self[year + 1].accum, "D", "sum")
+
+                if year not in self.part_years:
+                    ds_next = _time_reduce(self[year + 1].accum, "D", "sum")
 
         if window > 0:  # needs previous year
-            ds = xr.concat([ds_prev, ds, ds_next], dim=time_dim)
-        else:
+            ds = xr.concat([ds_prev, ds], dim=time_dim)
+
+        if (
+            year not in self.part_years
+        ):  # needs following year (when year is a completed year)
             ds = xr.concat([ds, ds_next], dim=time_dim)
 
         start_date = get_first_monday(year)
-        end_date = get_first_monday(year + 1) - datetime.timedelta(days=1)
+
+        if year not in self.part_years:
+            end_date = get_first_monday(year + 1) - datetime.timedelta(days=1)
+        else:
+            last_timepoint = ds.coords[time_dim].max().item()
+            end_date = get_last_sunday(pd.Timestamp(last_timepoint).date())
+
         if window > 0:
             start_date -= datetime.timedelta(days=7 * window)
         ds = ds.sel({time_dim: slice(start_date.isoformat(), end_date.isoformat())})

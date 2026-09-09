@@ -3,10 +3,10 @@
 # Merges multiple variables into one dataset
 # and then concatenates along the time dimension by default
 
-from pathlib import Path
-from typing import Any
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
 
 import xarray as xr
 
@@ -34,7 +34,7 @@ def _migrate_geoglue_config(d: dict[str, str | None]) -> dict[str, str | None]:
             continue
         try:
             cli_repr = str(ZonalStatsConfig.from_str(line))
-        except Exception:
+        except Exception:  # noqa: BLE001
             cli_repr = line
         migrated_lines.append(f"geoglue zonalstats {cli_repr}")
     migrated = "\n".join(migrated_lines)
@@ -68,7 +68,7 @@ def combine_attrs(
     # collect ordered set of keys
     keys: OrderedDict[str, bool] = OrderedDict()
     for d in dicts:
-        for k in d.keys():
+        for k in d:
             keys.setdefault(k, True)  # pyright: ignore[reportUnusedCallResult]
 
     out: dict[str, str] = {}
@@ -120,7 +120,7 @@ def _group_datasets(files: Iterable[Path], dim: str) -> list[list[Path]]:
     first_group_vars = vars_in_group[sorted_dims[0]]
 
     # check same variable set in each group
-    for _, vars in vars_in_group.items():
+    for vars in vars_in_group.values():
         if vars != first_group_vars:
             raise ValueError(f"Variable sets in all axis={dim!r} must be identical")
 
