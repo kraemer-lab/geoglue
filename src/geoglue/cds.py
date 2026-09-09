@@ -168,9 +168,9 @@ class CdsPath(NamedTuple):
     Tuple containing paths to instant and accumulated variables from cdsapi
     """
 
-    instant: Path | None
+    instant: Path
     "Path to instant variable dataset"
-    accum: Path | None
+    accum: Path
     "Path to accumulated variable dataset"
 
     def as_dataset(self, drop_vars: list[str] = DROP_VARS) -> CdsDataset:
