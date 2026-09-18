@@ -781,6 +781,26 @@ class DatasetPool:
         part_month = int(self.part_chunks[part_year_idx][0].split("-")[1])
         part_month_partial = self.part_chunks[part_year_idx][1] is not None
         return self.path(year, part_month, part_month_partial)
+    
+    def get_part_year(self, year: int) -> CdsDataset:
+        "Returns concatenated hourly dataset for all available month-chunks of a partially downloaded year"
+        chunks = sorted(
+            ((ym, part) for ym, part in self.part_chunks if ym.startswith(f"{year}-")),
+            key=lambda x: (x[0], x[1] or "")
+        )
+        if not chunks:
+            raise IndexError(f"No part-year chunks found for {year=}")
+
+        paths = [
+            self.path(year, int(ym.split("-")[1]), part is not None)
+            for ym, part in chunks
+        ]
+        ds = paths[0].as_dataset()
+        time_dim = ds.get_time_dim()
+        for p in paths[1:]:
+            ds = concat(ds, p.as_dataset(), time_dim)
+
+        return ds
 
     def get_current_year(
         self, start_date: datetime.date | str, end_date: datetime.date | str
@@ -876,8 +896,8 @@ class DatasetPool:
     def __getitem__(self, year: int) -> CdsDataset:
         """
         Returns hourly dataset for a particular year, time-shifted to local timezone.
-        For partially downloaded year (typical case for the current year), only the first month will be returned.
-        If you want to get the exact month, please use `DatasetPool.path_min_part_year(year: int)`
+        For partially downloaded year (typical case for the current year), monthly data are concatenated using DatasetPool.get_part_year(year: int).
+        If you want to get the first month, please use `DatasetPool.path_min_part_year(year: int)`
         """
         is_part_year = year in self.part_years
         if year not in self.years:
@@ -889,8 +909,7 @@ class DatasetPool:
                 raise IndexError(
                     f"{year=} not found in DatasetPool, valid years: {self.years}"
                 )
-        if self.shift_hours == 0:
-            return self.path(year).as_dataset()
+
         if self.shift_hours > 0 and not self.path(year - 1).exists():
             raise FileNotFoundError(
                 f"Positive shift_hours={self.shift_hours} require preceding year at {self.path(year - 1)}"
@@ -900,9 +919,15 @@ class DatasetPool:
                 f"Negative shift_hours={self.shift_hours} require succeeding year at {self.path(year + 1)}"
             )
         if is_part_year:
-            ds = self.path_min_part_year(year).as_dataset()
+            # ds = self.path_min_part_year(year).as_dataset()
+            ds = self.get_part_year(year)
         else:
             ds = self.path(year).as_dataset()
+
+        if self.shift_hours == 0:
+            return ds
+        
+        # The following only runs when self.shift != 0
         time_dim = ds.get_time_dim()
         time_coord = ds.instant.coords[time_dim]
         if self.shift_hours > 0:
@@ -910,9 +935,10 @@ class DatasetPool:
                 self.path(year - 1).as_dataset(), ds, self.shift_hours, dim=time_dim
             )
         else:
-            ds = timeshift_hours_cdsdataset(
-                ds, self.path(year + 1).as_dataset(), self.shift_hours, dim=time_dim
-            )
+            if not is_part_year:
+                ds = timeshift_hours_cdsdataset(
+                    ds, self.path(year + 1).as_dataset(), self.shift_hours, dim=time_dim
+                )
         assert (ds.instant.coords[time_dim] == ds.accum.coords[time_dim]).all()
         current_year = int(datetime.datetime.today().year)
         if time_coord.min().values != np.datetime64(f"{year}-01-01"):
@@ -986,10 +1012,9 @@ class DatasetPool:
                         "Invalid aggregation metric for 'accum' variable: must be 'sum' or unspecified"
                     )
                 
-        if not self.path(year - 1).exists():
-            raise FileNotFoundError(
-                f"Data for {year - 1} are required."
-            )
+
+        if window > 0 and not self.path(year - 1).exists():
+            raise FileNotFoundError(f"Data for {year - 1} are required.")
 
         if year not in self.part_years:
             if not (
@@ -1003,14 +1028,16 @@ class DatasetPool:
         match vartype:
             case "instant":
                 ds = _time_reduce(self[year].instant, "D", how_daily)
-                ds_prev = _time_reduce(self[year - 1].instant, "D", how_daily)
+                if window > 0:
+                    ds_prev = _time_reduce(self[year - 1].instant, "D", how_daily)
 
                 if year not in self.part_years:
                     ds_next = _time_reduce(self[year + 1].instant, "D", how_daily)
 
             case "accum":
                 ds = _time_reduce(self[year].accum, "D", "sum")
-                ds_prev = _time_reduce(self[year - 1].accum, "D", "sum")
+                if window > 0:
+                    ds_prev = _time_reduce(self[year - 1].accum, "D", "sum")
 
                 if year not in self.part_years:
                     ds_next = _time_reduce(self[year + 1].accum, "D", "sum")
