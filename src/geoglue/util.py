@@ -42,7 +42,7 @@ def bbox_from_region(region: str, integer_bounds: bool = False) -> Bbox:
     elif region.endswith(".shp"):  # crop to shapefile
         vec = gpd.read_file(region)
         bbox = Bbox(*vec.total_bounds)
-    elif region.endswith(".nc") or region.endswith(".tif"):
+    elif region.endswith((".nc", ".tif")):
         rast = read_raster(region)
         bbox = Bbox.from_xarray(rast)
     else:
@@ -105,23 +105,24 @@ def write_variables(ds: xr.Dataset, path: Path) -> list[Path]:
 
 def get_first_monday(year: int) -> datetime.date:
     "Gets first Monday of the year"
-    return datetime.datetime.strptime(f"{year}-W01-1", "%Y-W%W-%u").date()
+    return datetime.datetime.strptime(f"{year}-W01-1", "%Y-W%W-%u").astimezone().date()
 
 
 def get_last_sunday(x: int | datetime.date) -> datetime.date:
     """Gets the last Sunday of a year or the previous Sunday of a date."""
 
     if isinstance(x, int):
-        d = datetime.datetime.strptime(f"{x}-W51-7", "%Y-W%W-%u").date()
-
-        if (d + datetime.timedelta(days=7)).year == x: # one more week in the year!
+        # Gets the last Sunday of a year
+        d = datetime.datetime.strptime(f"{x}-W51-7", "%Y-W%W-%u").astimezone().date()
+        if (d + datetime.timedelta(days=7)).year == x:  # one more week in the year!
             return d + datetime.timedelta(days=7)
-
         return d
-    
-    if isinstance(x, datetime.date):
+    elif isinstance(x, datetime.date):
+        # Gets the previous Sunday given a specific date
         days_since_sunday = (x.weekday() + 1) % 7
         return x - datetime.timedelta(days=days_since_sunday)
+    else:
+        raise TypeError(f"Expected `int` or `datetime.date`, got {type(x).__name__}")
 
 
 def sha256(file_path: str | Path, prefix: bool = False) -> str:
@@ -220,12 +221,12 @@ def find_time_coords(ds: xr.Dataset | xr.DataArray) -> list[str]:
     time_coords = []
     for coord in ds.coords:
         # Check if the data type is datetime64
-        if np.issubdtype(ds[coord].dtype, np.datetime64):
-            time_coords.append(coord)
-        # Or check CF conventions
-        elif "units" in ds[coord].attrs and "since" in ds[coord].attrs["units"]:
-            time_coords.append(coord)
-        elif ds[coord].attrs.get("standard_name") == "time":
+        if (
+            np.issubdtype(ds[coord].dtype, np.datetime64)
+            or "units" in ds[coord].attrs
+            and "since" in ds[coord].attrs["units"]
+            or ds[coord].attrs.get("standard_name") == "time"
+        ):
             time_coords.append(coord)
     return time_coords
 
@@ -279,8 +280,7 @@ def download_file(
         path = path / url.split("/")[-1]
     if (r := requests.get(url)).status_code == 200:
         with open(path, "wb") as out:
-            for bits in r.iter_content():
-                out.write(bits)
+            out.writelines(r.iter_content())
         # Unpack file
         if unpack and any(str(path).endswith(ext) for ext in COMPRESSED_FILE_EXTS):
             logger.info(f"Unpacking downloaded file {path}")

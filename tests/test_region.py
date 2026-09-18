@@ -132,7 +132,7 @@ def test_region_gadm(region_gadm):
 
 
 def test_timezone_warnings():
-    assert get_timezone("USA", datetime.datetime(2024, 1, 1)) is None
+    assert get_timezone("USA", datetime.datetime(2024, 1, 1)) is None  # noqa: DTZ001
 
 
 @pytest.mark.parametrize("year,population", [(2000, 79910432), (2020, 97338600)])
