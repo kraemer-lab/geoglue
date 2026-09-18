@@ -421,3 +421,15 @@ def test_weekly_reduce(data_singapore, window):
         case 6:
             assert ds.valid_time.min() == np.datetime64("2019-11-25")
     assert ds.valid_time.max() == np.datetime64("2020-12-28")
+
+@pytest.mark.parametrize("window", [0])
+def test_weekly_reduce_partial_year(data_singapore, window):
+    # force shift = 0 to test w/out needing 2024 data 
+    data_singapore.timezone_offset = "00:00"
+    pool = data_singapore.get_dataset_pool()
+    pool.shift_hours = 0
+    ds = pool.weekly_reduce(2025, "instant", window=window)
+    diff = ds.valid_time[1] - ds.valid_time[0]
+    assert int(diff / 1e9) == 7 * 24 * 3600  # check that dataset is weekly
+
+    assert ds.valid_time.max() == np.datetime64("2025-06-16")
