@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+
 from geoglue.config import (
     GeoglueConfig,
     ShapefileConfig,
@@ -23,28 +24,25 @@ geoglue_config = GeoglueConfig(
 )
 
 
-zonalstats_config1 = " ".join(
-    [
-        "raster=data/country/BRA-2015-gdp_pc.nc",
-        "shapefile=data/geometry/BR_Municipios_2023.shp",
-        "shapefile_id=CD_MUN",
-        "output=BRA-2015-gdp_pc.zs.nc",
-        "operation=weighted_mean(coverage_weight=area_spherical_km2,default_weight=0)",
-        "weights=data/worldpop/bra_pop_2015_CN_1km_R2025A_UA_v1.tif",
-        "resample=sremapbil",
-    ]
+zonalstats_config1 = (
+    "raster=data/country/BRA-2015-gdp_pc.nc "
+    "shapefile=data/geometry/BR_Municipios_2023.shp "
+    "shapefile_id=CD_MUN "
+    "output=BRA-2015-gdp_pc.zs.nc "
+    "operation=weighted_mean(coverage_weight=area_spherical_km2,default_weight=0) "
+    "weights=data/worldpop/bra_pop_2015_CN_1km_R2025A_UA_v1.tif "
+    "resample=sremapbil "
 )
 
-zonalstats_config2 = " ".join(
-    [
-        "raster=data/country/BRA-2016-gdp_pc.nc",
-        "shapefile=data/geometry/BR_Municipios_2023.shp",
-        "shapefile_id=CD_MUN",
-        "output=BRA-2016-gdp_pc.zs.nc",
-        "operation=weighted_mean(coverage_weight=area_spherical_km2,default_weight=0)",
-        "weights=data/worldpop/bra_pop_2016_CN_1km_R2025A_UA_v1.tif",
-        "resample=sremapbil",
-    ]
+
+zonalstats_config2 = (
+    "raster=data/country/BRA-2016-gdp_pc.nc "
+    "shapefile=data/geometry/BR_Municipios_2023.shp "
+    "shapefile_id=CD_MUN "
+    "output=BRA-2016-gdp_pc.zs.nc "
+    "operation=weighted_mean(coverage_weight=area_spherical_km2,default_weight=0) "
+    "weights=data/worldpop/bra_pop_2016_CN_1km_R2025A_UA_v1.tif "
+    "resample=sremapbil "
 )
 
 

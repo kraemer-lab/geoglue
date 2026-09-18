@@ -1,7 +1,8 @@
 "Test bounds comparison"
 
-import xarray as xr
 import numpy.testing as npt
+import xarray as xr
+
 from geoglue.types import Bbox
 
 b1 = Bbox(maxy=10, minx=-5, miny=-1, maxx=20)

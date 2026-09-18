@@ -1,8 +1,9 @@
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
-import xarray as xr
 import pytest
+import xarray as xr
+
 from geoglue.reshape import collapse_step_to_month_dataarray, get_durations
 
 
