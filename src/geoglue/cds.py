@@ -59,8 +59,8 @@ def _is_hourly(ds: xr.Dataset, time_dim: str = "valid_time") -> bool:
 
 
 def concat(a: CdsDataset, b: CdsDataset, time_dim: str = "valid_time") -> CdsDataset:
-    instant_combined = xr.concat([a.instant, b.instant], dim=time_dim)
-    accum_combined = xr.concat([a.accum, b.accum], dim=time_dim)
+    instant_combined = xr.concat([a.instant, b.instant], dim=time_dim, join="outer")
+    accum_combined = xr.concat([a.accum, b.accum], dim=time_dim, join="outer")
     return CdsDataset(instant=instant_combined, accum=accum_combined)
 
 
@@ -286,11 +286,11 @@ def timeshift_hours(
         raise ValueError(f"Timeshift valid for shift=-12..12, provided {shift=}")
     if shift > 0:
         ds1 = ds1.isel(**{dim: slice(-shift, None)})  # type: ignore
-        ds = xr.concat([ds1, ds2], dim=dim)
+        ds = xr.concat([ds1, ds2], dim=dim, join="outer")
         ds = ds.isel(**{dim: slice(None, -shift)})  # type: ignore
     else:
         ds2 = ds2.isel(**{dim: slice(None, abs(shift))})  # type: ignore
-        ds = xr.concat([ds1, ds2], dim=dim)
+        ds = xr.concat([ds1, ds2], dim=dim, join="outer")
         ds = ds.isel(**{dim: slice(abs(shift), None)})  # type: ignore
 
     time_shift = pd.Timedelta(hours=shift)
@@ -1046,12 +1046,12 @@ class DatasetPool:
                     ds_next = _time_reduce(self[year + 1].accum, "D", "sum")
 
         if window > 0:  # needs previous year
-            ds = xr.concat([ds_prev, ds], dim=time_dim)
+            ds = xr.concat([ds_prev, ds], dim=time_dim, join="outer")
 
         if (
             year not in self.part_years
         ):  # needs following year (when year is a completed year)
-            ds = xr.concat([ds, ds_next], dim=time_dim)
+            ds = xr.concat([ds, ds_next], dim=time_dim, join="outer")
 
         start_date = get_first_monday(year)
 
