@@ -3,27 +3,27 @@
 
 import datetime
 import tempfile
-from pathlib import Path
+import warnings
 from collections.abc import Iterable
+from pathlib import Path
 
-from cdo import Cdo  # pyright: ignore[reportMissingTypeStubs]
 import click
 import xarray as xr
-import warnings
+from cdo import Cdo  # pyright: ignore[reportMissingTypeStubs]
 
 from geoglue.plot import plot
 
-from .types import Bbox
-from .merge import merge_datasets
-from .util import bbox_from_region, read_raster, write_variables, read_geotiff
-from .zonalstats import compute_config
-from .validate import print_file_stats
 from .config import (
     ResampleType,
     ShapefileConfig,
     ZonalStatsConfig,
     read_config,
 )
+from .merge import merge_datasets
+from .types import Bbox
+from .util import bbox_from_region, read_geotiff, read_raster, write_variables
+from .validate import print_file_stats
+from .zonalstats import compute_config
 
 warnings.filterwarnings(
     "ignore",
@@ -289,13 +289,13 @@ def zonalstats(
     except FileNotFoundError as e:
         print(e)
         raise SystemExit(1)
-    start_time = datetime.datetime.now(datetime.timezone.utc)
+    start_time = datetime.datetime.now(datetime.UTC)
     print(f"zonalstats\tconf={gcfg.source} begin={start_time.isoformat()}")
     da = compute_config(cfg)
     nna = da.isnull().sum().item()
     da.to_netcdf(cfg.output)
     print(f"zonalstats\tNA={nna} geoglue zonalstats {cfg}")
-    end_time = datetime.datetime.now(datetime.timezone.utc)
+    end_time = datetime.datetime.now(datetime.UTC)
     print(
         f"zonalstats\tconf={gcfg.source} end={end_time.isoformat()} elapsed={(end_time - start_time).seconds}s"
     )
@@ -332,7 +332,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         click.echo("Interrupted by user", err=True)
         return 130
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         click.echo(f"Unexpected error: {type(exc).__name__}: {exc}", err=True)
         return 1
 

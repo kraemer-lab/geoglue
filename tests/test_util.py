@@ -1,16 +1,17 @@
+from datetime import datetime
+
+import numpy as np
 import pytest
 import xarray as xr
-import numpy as np
-from datetime import datetime
 
 from geoglue.types import CdoGriddes
 from geoglue.util import (
-    zero_padded_intrange,
-    is_lonlat,
-    set_lonlat_attrs,
     find_unique_time_coord,
     get_first_monday,
     get_last_sunday,
+    is_lonlat,
+    set_lonlat_attrs,
+    zero_padded_intrange,
 )
 
 

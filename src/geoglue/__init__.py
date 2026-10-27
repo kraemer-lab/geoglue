@@ -1,19 +1,19 @@
+from .paths import geoglue_cache_path as cache_path
+from .paths import geoglue_data_path as data_path
 from .region import (
-    Region,
-    Country,
     AdministrativeLevel,
+    Country,
     CountryAdministrativeLevel,
+    Region,
     get_region,
 )
-from .paths import geoglue_data_path as data_path
-from .paths import geoglue_cache_path as cache_path
 
 __all__ = [
-    "Region",
-    "Country",
     "AdministrativeLevel",
+    "Country",
     "CountryAdministrativeLevel",
-    "get_region",
-    "data_path",
+    "Region",
     "cache_path",
+    "data_path",
+    "get_region",
 ]

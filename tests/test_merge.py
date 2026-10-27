@@ -4,11 +4,11 @@ import pytest
 import xarray as xr
 
 from geoglue.merge import (
-    combine_attrs,
-    variable_merge,
     _group_datasets,
-    merge_datasets,
     _migrate_geoglue_config,
+    combine_attrs,
+    merge_datasets,
+    variable_merge,
 )
 
 
@@ -80,16 +80,15 @@ class TestCombineAttrs:
         assert result == {"history": "step1\nstep2\nstep3"}
 
     def test_geoglue_config_migrated_logfmt_to_cli(self):
-        logfmt = " ".join(
-            [
-                "raster=data/raster.nc",
-                "shapefile=data/shapefile.shp",
-                "shapefile_id=ADMIN",
-                "output=output.zs.nc",
-                "operation=mean(coverage_weight=area_spherical_km2)",
-                "resample=off",
-            ]
+        logfmt = (
+            "raster=data/raster.nc "
+            "shapefile=data/shapefile.shp "
+            "shapefile_id=ADMIN "
+            "output=output.zs.nc "
+            "operation=mean(coverage_weight=area_spherical_km2) "
+            "resample=off "
         )
+
         result = _migrate_geoglue_config({"geoglue_config": logfmt})
         assert result == {
             "history": "geoglue zonalstats data/raster.nc data/shapefile.shp::ADMIN"
@@ -124,16 +123,15 @@ class TestCombineAttrs:
         }
 
     def test_geoglue_config_migration_preserves_existing_history(self):
-        logfmt = " ".join(
-            [
-                "raster=data/raster.nc",
-                "shapefile=data/shapefile.shp",
-                "shapefile_id=ADMIN",
-                "output=output.zs.nc",
-                "operation=mean(coverage_weight=area_spherical_km2)",
-                "resample=off",
-            ]
+        logfmt = (
+            "raster=data/raster.nc "
+            "shapefile=data/shapefile.shp "
+            "shapefile_id=ADMIN "
+            "output=output.zs.nc "
+            "operation=mean(coverage_weight=area_spherical_km2) "
+            "resample=off "
         )
+
         result = _migrate_geoglue_config(
             {"geoglue_config": logfmt, "history": "prior step"}
         )

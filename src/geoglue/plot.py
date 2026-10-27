@@ -3,9 +3,9 @@
 import logging
 from pathlib import Path
 
-import xarray as xr
 import geopandas as gpd
 import matplotlib.pyplot as plt
+import xarray as xr
 
 from .config import read_zonalstats_config
 

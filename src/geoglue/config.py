@@ -2,12 +2,13 @@
 # pyright: reportUnusedCallResult=none, reportAny=none
 
 from __future__ import annotations
+
+import argparse
+import logging
 import os
 import shlex
-import typing
-import logging
-import argparse
 import tomllib as toml
+import typing
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,9 +39,12 @@ class VariableSpec:
     max_na_frac: float = 0.0
 
     def validate(self) -> None:
-        if self.min is not None and self.max is not None:
-            if float(self.min) > float(self.max):
-                raise ValueError(f"min ({self.min}) > max ({self.max})")
+        if (
+            self.min is not None
+            and self.max is not None
+            and float(self.min) > float(self.max)
+        ):
+            raise ValueError(f"min ({self.min}) > max ({self.max})")
         if not (0.0 <= self.max_na_frac <= 1.0):
             raise ValueError(
                 f"max_na_frac must be between 0 and 1 (got {self.max_na_frac})."

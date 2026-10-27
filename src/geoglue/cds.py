@@ -12,8 +12,9 @@ import operator
 import re
 import warnings
 import zipfile
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Iterable, Literal, NamedTuple, Sequence
+from typing import Literal, NamedTuple
 
 import cdsapi
 import numpy as np
@@ -22,7 +23,9 @@ import xarray as xr
 
 from .paths import geoglue_cache_path, geoglue_data_path
 from .region import VALID_ISO3, ZonedBaseRegion
-from .util import find_unique_time_coord, get_first_monday
+from .util import find_unique_time_coord, get_first_monday, get_last_sunday
+
+# ruff: noqa: DTZ002
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +59,8 @@ def _is_hourly(ds: xr.Dataset, time_dim: str = "valid_time") -> bool:
 
 
 def concat(a: CdsDataset, b: CdsDataset, time_dim: str = "valid_time") -> CdsDataset:
-    instant_combined = xr.concat([a.instant, b.instant], dim=time_dim)
-    accum_combined = xr.concat([a.accum, b.accum], dim=time_dim)
+    instant_combined = xr.concat([a.instant, b.instant], dim=time_dim, join="outer")
+    accum_combined = xr.concat([a.accum, b.accum], dim=time_dim, join="outer")
     return CdsDataset(instant=instant_combined, accum=accum_combined)
 
 
@@ -165,9 +168,9 @@ class CdsPath(NamedTuple):
     Tuple containing paths to instant and accumulated variables from cdsapi
     """
 
-    instant: Path | None
+    instant: Path
     "Path to instant variable dataset"
-    accum: Path | None
+    accum: Path
     "Path to accumulated variable dataset"
 
     def as_dataset(self, drop_vars: list[str] = DROP_VARS) -> CdsDataset:
@@ -283,11 +286,11 @@ def timeshift_hours(
         raise ValueError(f"Timeshift valid for shift=-12..12, provided {shift=}")
     if shift > 0:
         ds1 = ds1.isel(**{dim: slice(-shift, None)})  # type: ignore
-        ds = xr.concat([ds1, ds2], dim=dim)
+        ds = xr.concat([ds1, ds2], dim=dim, join="outer")
         ds = ds.isel(**{dim: slice(None, -shift)})  # type: ignore
     else:
         ds2 = ds2.isel(**{dim: slice(None, abs(shift))})  # type: ignore
-        ds = xr.concat([ds1, ds2], dim=dim)
+        ds = xr.concat([ds1, ds2], dim=dim, join="outer")
         ds = ds.isel(**{dim: slice(abs(shift), None)})  # type: ignore
 
     time_shift = pd.Timedelta(hours=shift)
@@ -709,7 +712,7 @@ class DatasetPool:
         match_groups = [m.groups() for m in matches if m]
         logger.debug(f"DatasetPool match groups: {match_groups}")
         part_match_groups = [m.groups() for m in part_matches if m]
-        parents = set(p.parent for p in self.paths)
+        parents = {p.parent for p in self.paths}
         if len(parents) != 1:
             raise ValueError(
                 f"All files in DatasetPool must be in same folder, found multiple parent folders: {parents}"
@@ -727,7 +730,7 @@ class DatasetPool:
         self.part_chunks: list[tuple[str, str | None]] = sorted(
             set(map(operator.itemgetter(1, 2), part_match_groups))
         )
-        self.part_years = list(set([int(x[0].split("-")[0]) for x in self.part_chunks]))
+        self.part_years = list({int(x[0].split("-")[0]) for x in self.part_chunks})
         if len(stubs) > 1 or len(iso3) > 1:
             raise ValueError(
                 f"Multiple {iso3=} or {stubs=} not allowed in DatasetPool, specify a stricter path glob"
@@ -781,6 +784,26 @@ class DatasetPool:
         part_month = int(self.part_chunks[part_year_idx][0].split("-")[1])
         part_month_partial = self.part_chunks[part_year_idx][1] is not None
         return self.path(year, part_month, part_month_partial)
+    
+    def get_part_year(self, year: int) -> CdsDataset:
+        "Returns concatenated hourly dataset for all available month-chunks of a partially downloaded year"
+        chunks = sorted(
+            ((ym, part) for ym, part in self.part_chunks if ym.startswith(f"{year}-")),
+            key=lambda x: (x[0], x[1] or "")
+        )
+        if not chunks:
+            raise IndexError(f"No part-year chunks found for {year=}")
+
+        paths = [
+            self.path(year, int(ym.split("-")[1]), part is not None)
+            for ym, part in chunks
+        ]
+        ds = paths[0].as_dataset()
+        time_dim = ds.get_time_dim()
+        for p in paths[1:]:
+            ds = concat(ds, p.as_dataset(), time_dim)
+
+        return ds
 
     def get_current_year(
         self, start_date: datetime.date | str, end_date: datetime.date | str
@@ -809,7 +832,7 @@ class DatasetPool:
 
         def extract_month(f):
             mo = f.stem.split("-")[2]
-            if mo.startswith("1") or mo.startswith("0"):
+            if mo.startswith(("1", "0")):
                 return mo
             return None
 
@@ -876,8 +899,8 @@ class DatasetPool:
     def __getitem__(self, year: int) -> CdsDataset:
         """
         Returns hourly dataset for a particular year, time-shifted to local timezone.
-        For partially downloaded year (typical case for the current year), only the first month will be returned.
-        If you want to get the exact month, please use `DatasetPool.path_min_part_year(year: int)`
+        For partially downloaded year (typical case for the current year), monthly data are concatenated using DatasetPool.get_part_year(year: int).
+        If you want to get the first month, please use `DatasetPool.path_min_part_year(year: int)`
         """
         is_part_year = year in self.part_years
         if year not in self.years:
@@ -889,20 +912,29 @@ class DatasetPool:
                 raise IndexError(
                     f"{year=} not found in DatasetPool, valid years: {self.years}"
                 )
-        if self.shift_hours == 0:
-            return self.path(year).as_dataset()
+
         if self.shift_hours > 0 and not self.path(year - 1).exists():
             raise FileNotFoundError(
                 f"Positive shift_hours={self.shift_hours} require preceding year at {self.path(year - 1)}"
             )
-        if self.shift_hours < 0 and not self.path(year + 1).exists():
+        if (
+            self.shift_hours < 0
+            and not is_part_year
+            and not self.path(year + 1).exists()
+        ):
             raise FileNotFoundError(
                 f"Negative shift_hours={self.shift_hours} require succeeding year at {self.path(year + 1)}"
             )
         if is_part_year:
-            ds = self.path_min_part_year(year).as_dataset()
+            # ds = self.path_min_part_year(year).as_dataset()
+            ds = self.get_part_year(year)
         else:
             ds = self.path(year).as_dataset()
+
+        if self.shift_hours == 0:
+            return ds
+        
+        # The following only runs when self.shift != 0
         time_dim = ds.get_time_dim()
         time_coord = ds.instant.coords[time_dim]
         if self.shift_hours > 0:
@@ -910,9 +942,10 @@ class DatasetPool:
                 self.path(year - 1).as_dataset(), ds, self.shift_hours, dim=time_dim
             )
         else:
-            ds = timeshift_hours_cdsdataset(
-                ds, self.path(year + 1).as_dataset(), self.shift_hours, dim=time_dim
-            )
+            if not is_part_year:
+                ds = timeshift_hours_cdsdataset(
+                    ds, self.path(year + 1).as_dataset(), self.shift_hours, dim=time_dim
+                )
         assert (ds.instant.coords[time_dim] == ds.accum.coords[time_dim]).all()
         current_year = int(datetime.datetime.today().year)
         if time_coord.min().values != np.datetime64(f"{year}-01-01"):
@@ -930,6 +963,7 @@ class DatasetPool:
 
         return ds
 
+    # TODO: handle scenario for when endyear is a partial year
     def weekly_reduce(
         self,
         year: int,
@@ -984,31 +1018,49 @@ class DatasetPool:
                     raise ValueError(
                         "Invalid aggregation metric for 'accum' variable: must be 'sum' or unspecified"
                     )
-        if not self.path(year - 1).exists() or not (
+                
+
+        if window > 0 and not self.path(year - 1).exists():
+            raise FileNotFoundError(f"Data for {year - 1} are required.")
+
+        if year not in self.part_years and not (
             self.path(year + 1).exists() or self.path_min_part_year(year + 1).exists()
         ):
-            raise FileNotFoundError(
-                f"Both data for {year - 1} and {year + 1} must be present for weekly statistics for {year=}"
-            )
+            raise FileNotFoundError(f"Data for {year + 1} are required.")
 
         match vartype:
             case "instant":
                 ds = _time_reduce(self[year].instant, "D", how_daily)
-                ds_prev = _time_reduce(self[year - 1].instant, "D", how_daily)
-                ds_next = _time_reduce(self[year + 1].instant, "D", how_daily)
+                if window > 0:
+                    ds_prev = _time_reduce(self[year - 1].instant, "D", how_daily)
+
+                if year not in self.part_years:
+                    ds_next = _time_reduce(self[year + 1].instant, "D", how_daily)
 
             case "accum":
                 ds = _time_reduce(self[year].accum, "D", "sum")
-                ds_prev = _time_reduce(self[year - 1].accum, "D", "sum")
-                ds_next = _time_reduce(self[year + 1].accum, "D", "sum")
+                if window > 0:
+                    ds_prev = _time_reduce(self[year - 1].accum, "D", "sum")
+
+                if year not in self.part_years:
+                    ds_next = _time_reduce(self[year + 1].accum, "D", "sum")
 
         if window > 0:  # needs previous year
-            ds = xr.concat([ds_prev, ds, ds_next], dim=time_dim)
-        else:
-            ds = xr.concat([ds, ds_next], dim=time_dim)
+            ds = xr.concat([ds_prev, ds], dim=time_dim, join="outer")
+
+        if (
+            year not in self.part_years
+        ):  # needs following year (when year is a completed year)
+            ds = xr.concat([ds, ds_next], dim=time_dim, join="outer")
 
         start_date = get_first_monday(year)
-        end_date = get_first_monday(year + 1) - datetime.timedelta(days=1)
+
+        if year not in self.part_years:
+            end_date = get_first_monday(year + 1) - datetime.timedelta(days=1)
+        else:
+            last_timepoint = ds.coords[time_dim].max().item()
+            end_date = get_last_sunday(pd.Timestamp(last_timepoint).date())
+
         if window > 0:
             start_date -= datetime.timedelta(days=7 * window)
         ds = ds.sel({time_dim: slice(start_date.isoformat(), end_date.isoformat())})

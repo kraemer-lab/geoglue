@@ -135,7 +135,7 @@ def compute_config(cfg: ZonalStatsConfig) -> xr.DataArray:
     # Currently only dataarrays are supported
     rast = xr.open_dataarray(raster_path)
     da = zonalstats(rast, vec, cfg.operation, weights=weights)
-    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime(
+    timestamp = datetime.datetime.now(datetime.UTC).strftime(
         "%Y-%m-%d %H:%M:%S UTC"
     )
     new_entry = f"{timestamp}: geoglue zonalstats {cfg}"

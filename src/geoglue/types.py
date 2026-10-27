@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
-import math
 import copy
+import math
 import tempfile
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import NamedTuple
-from dataclasses import dataclass, asdict
 
 import numpy as np
-import xarray as xr
 import shapely.geometry
-from pyproj import Geod
-
+import xarray as xr
 from cdo import Cdo
+from pyproj import Geod
 
 geod = Geod(ellps="WGS84")
 
@@ -207,7 +206,7 @@ class CdoGriddes:
     def __str__(self) -> str:
         out = []
         for k, v in asdict(self).items():
-            if k.endswith("units") or k.endswith("longname"):
+            if k.endswith(("units", "longname")):
                 out.append(f'{k:9s} = "{v}"')
             else:
                 out.append(f"{k:9s} = {v}")
@@ -232,7 +231,7 @@ class CdoGriddes:
             if key.endswith("size"):
                 out[key] = int(value)
                 continue
-            if key.endswith("first") or key.endswith("inc"):
+            if key.endswith(("first", "inc")):
                 out[key] = float(value)
             else:
                 out[key] = value.replace('"', "")
