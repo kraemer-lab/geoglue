@@ -19,7 +19,7 @@ from geoglue.cds import (
 from geoglue.region import Country, CountryAdministrativeLevel, Region
 from geoglue.types import Bbox
 
-# ruff: noqa: DTZ001, DTZ002
+# ruff: noqa: DTZ002
 
 BRB = Country(
     "BRB",
@@ -424,9 +424,10 @@ def test_weekly_reduce(data_singapore, window):
             assert ds.valid_time.min() == np.datetime64("2019-11-25")
     assert ds.valid_time.max() == np.datetime64("2020-12-28")
 
+
 @pytest.mark.parametrize("window", [0])
 def test_weekly_reduce_partial_year(data_singapore, window):
-    # force shift = 0 to test w/out needing 2024 data 
+    # force shift = 0 to test w/out needing 2024 data
     data_singapore.timezone_offset = "00:00"
     pool = data_singapore.get_dataset_pool()
     pool.shift_hours = 0
