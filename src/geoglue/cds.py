@@ -702,7 +702,7 @@ class DatasetPool:
             r"^([A-Z]{3})-(\d{4})-(STUB)\.(instant|accum)\.nc$".replace("STUB", stub)
         )
         part_regex = re.compile(
-            r"^([A-Z]{3})-(\d{4}-0\d|1[0-2])(_part)?-(STUB)\.(instant|accum)\.nc$".replace(
+            r"^([A-Z]{3})-(\d{4}-(?:0\d|1[0-2]))(_part)?-(STUB)\.(instant|accum)\.nc$".replace(
                 "STUB", stub
             )
         )
@@ -784,12 +784,12 @@ class DatasetPool:
         part_month = int(self.part_chunks[part_year_idx][0].split("-")[1])
         part_month_partial = self.part_chunks[part_year_idx][1] is not None
         return self.path(year, part_month, part_month_partial)
-    
+
     def get_part_year(self, year: int) -> CdsDataset:
         "Returns concatenated hourly dataset for all available month-chunks of a partially downloaded year"
         chunks = sorted(
             ((ym, part) for ym, part in self.part_chunks if ym.startswith(f"{year}-")),
-            key=lambda x: (x[0], x[1] or "")
+            key=lambda x: (x[0], x[1] or ""),
         )
         if not chunks:
             raise IndexError(f"No part-year chunks found for {year=}")
@@ -933,7 +933,7 @@ class DatasetPool:
 
         if self.shift_hours == 0:
             return ds
-        
+
         # The following only runs when self.shift != 0
         time_dim = ds.get_time_dim()
         time_coord = ds.instant.coords[time_dim]
@@ -1018,7 +1018,6 @@ class DatasetPool:
                     raise ValueError(
                         "Invalid aggregation metric for 'accum' variable: must be 'sum' or unspecified"
                     )
-                
 
         if window > 0 and not self.path(year - 1).exists():
             raise FileNotFoundError(f"Data for {year - 1} are required.")
