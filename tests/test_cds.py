@@ -235,6 +235,21 @@ def test_get_grib(mock_client):
     )
 
 
+@patch("cdsapi.Client", autospec=True)
+def test_get_grib_partial(mock_client):
+    ReanalysisSingleLevels(
+        SGP,
+        VARIABLES,
+        data_format="grib",
+    ).get(2020, months=12, days=range(25, 32))
+    mock_client().retrieve.assert_called_once_with(
+        "reanalysis-era5-single-levels",
+        EXPECTED_REQUEST_GRIB
+        | {"month": ["12"], "day": ["25", "26", "27", "28", "29", "30", "31"]},
+        Path("~/.local/share/geoglue/SGP/era5/SGP-2020-era5.grib").expanduser(),
+    )
+
+
 def test_get_partial_failure_modes():
     fake_date = datetime.datetime(2025, 7, 3)
     r = ReanalysisSingleLevels(

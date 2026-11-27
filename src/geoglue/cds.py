@@ -617,7 +617,13 @@ class ReanalysisSingleLevels:
             )
         return chunks
 
-    def get(self, year: int, skip_exists: bool = True) -> CdsPath | None:
+    def get(
+        self,
+        year: int,
+        skip_exists: bool = True,
+        months: Sequence[int] | int | None = None,
+        days: Sequence[int] | None = None,
+    ) -> CdsPath | None:
         """Fetches hourly data for a particular year.
 
         An API key is needed for this function to work, see instructions at
@@ -629,6 +635,11 @@ class ReanalysisSingleLevels:
             Data is downloaded for this year
         skip_exists
             Skip downloading if zipfile or extracted contents exist, default True
+        months
+            Months to download, default is all months
+        days
+            Days of month to download, default is all days.
+            **Partial downloads are saved with the same filenames as a full year**
 
         Returns
         -------
@@ -657,7 +668,9 @@ class ReanalysisSingleLevels:
         if not skip_exists or not outfile.exists():
             client = cdsapi.Client()
             client.retrieve(
-                "reanalysis-era5-single-levels", self._cdsapi_request(year), outfile
+                "reanalysis-era5-single-levels",
+                self._cdsapi_request(year, months, days),
+                outfile,
             )
         if outfile.exists():
             match self.data_format:
